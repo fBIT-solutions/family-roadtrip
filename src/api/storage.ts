@@ -43,9 +43,11 @@ export async function getFilesByCategory(
   category: "document" | "ticket" | "picture" | "other"
 ): Promise<FileMetadata[]> {
   try {
-    const query = `SELECT * FROM c WHERE c.category = @category`;
     const { resources } = await containers.files.items
-      .query(query, { parameters: [{ name: "@category", value: category }] })
+      .query({
+        query: `SELECT * FROM c WHERE c.category = @category`,
+        parameters: [{ name: "@category", value: category }],
+      })
       .fetchAll();
 
     return resources.map((r) => FileMetadataSchema.parse(r));
