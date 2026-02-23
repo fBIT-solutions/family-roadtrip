@@ -1,0 +1,13 @@
+node_modules/
+.next/
+dist/
+.env.local
+.env.local.backup
+.DS_Store
+*.log
+*.pem
+*.key
+*.pub
+.vscode/
+.idea/
+.env
