@@ -56,7 +56,9 @@ export default function PreferencesPanel() {
 
   const fetchPreferences = async () => {
     try {
-      const response = await fetch("/api/user/preferences");
+      const response = await fetch("/api/user/preferences", {
+        credentials: "include",
+      });
       if (!response.ok) {
         console.error("Failed to fetch preferences:", response.status);
         setLoading(false);
@@ -82,6 +84,7 @@ export default function PreferencesPanel() {
     try {
       const response = await fetch("/api/user/preferences", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(preferences),
       });

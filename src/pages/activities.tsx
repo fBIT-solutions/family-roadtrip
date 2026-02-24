@@ -385,6 +385,7 @@ export default function Activities({
                       category: activity.category,
                       url: activity.url || undefined,
                       estimatedCost: activity.estimatedCost,
+                      currency: activity.currency || "EUR",
                       duration: activity.duration || undefined,
                     });
                     setActivities([response.data, ...activities]);

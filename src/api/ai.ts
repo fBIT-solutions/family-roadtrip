@@ -359,7 +359,8 @@ export async function recommendActivities(
   interests: string[],
   budget: number,
   currency: string = "EUR",
-  userId?: string
+  userId?: string,
+  userPreferences?: any
 ): Promise<ActivityRecommendation[]> {
   try {
     console.log("recommendActivities called:", { destination: destination.name, interests, budget });
@@ -395,14 +396,30 @@ export async function recommendActivities(
       console.log("No existing activities found");
     }
 
-    const existingActivityNames = existingActivities
-      .map((a) => a.name)
-      .join(", ");
+    let existingActivityNamesList = existingActivities.map((a) => a.name);
+    
+    // Include explicitly passed existing activities from endpoint
+    if (userPreferences?.existingActivityNames && Array.isArray(userPreferences.existingActivityNames)) {
+      existingActivityNamesList = [...new Set([...existingActivityNamesList, ...userPreferences.existingActivityNames])];
+    }
+
+    const existingActivityNames = existingActivityNamesList.join(", ");
 
     // Get user preferences and dislikes
-    const { preferences, dislikedNames, dislikedCategories, dislikedTags } = userId
+    let { preferences, dislikedNames, dislikedCategories, dislikedTags } = userId
       ? await getUserPreferencesAndDislikes(userId)
       : { preferences: {}, dislikedNames: [], dislikedCategories: [], dislikedTags: [] };
+
+    // Merge with passed-in preferences
+    if (userPreferences) {
+      preferences = { ...preferences, ...userPreferences };
+      if (userPreferences.dislikes && userPreferences.dislikes.length > 0) {
+        dislikedNames = [...new Set([...dislikedNames, ...userPreferences.dislikes])];
+      }
+      if (userPreferences.cuisinePreferences && userPreferences.cuisinePreferences.length > 0) {
+        dislikedTags = [...new Set([...dislikedTags, ...userPreferences.cuisinePreferences])];
+      }
+    }
 
     // Build exclusions list
     const excludedItems = [...new Set([
@@ -415,6 +432,10 @@ export async function recommendActivities(
       ? preferences.interests.join(", ") 
       : interests.join(", "));
 
+    const cuisineNote = preferences?.cuisinePreferences && preferences.cuisinePreferences.length > 0
+      ? `Preferred cuisines: ${preferences.cuisinePreferences.join(", ")}\n`
+      : "";
+
     // Simplified prompt to ensure we get complete responses
     const prompt = `Return EXACTLY 3 unique activities in JSON format.
 
@@ -425,11 +446,12 @@ AVOID: ${excludedItems || "None"}
 AVOID categories: ${excludedCategories}
 AVOID items with: ${dislikedTags.join(", ") || "None"}
 Already planned: ${existingActivityNames || "None"}
+${cuisineNote}
 
 Return 3 complete activities as JSON array:
-[{"name":"Activity","description":"What to do and see in 1-2 sentences","category":"outdoor|cultural|food|shopping|relaxation","estimatedCost":45,"currency":"${currency}","duration":"2-3 hours","confidence":0.85,"reason":"Why it fits interests"},...]
+[{"name":"Activity","description":"What to do and see in 1-2 sentences","category":"outdoor|cultural|food|shopping|relaxation","estimatedCost":45,"currency":"${currency}","duration":"2-3 hours","sourceUrl":"https://maps.google.com/search/...","confidence":0.85,"reason":"Why it fits interests"},...]
 
-MUST RETURN ALL 3. All fields required. Complete info only.`;
+MUST RETURN ALL 3. All fields required. Include sourceUrl as valid URL (Google Maps, TripAdvisor, or official website). Complete info only.`;
 
     console.log("Activity recommendation prompt length:", prompt.length, "chars");
     
@@ -505,7 +527,8 @@ export async function recommendDestinations(
   tripDurationDays: number = 14,
   userId?: string,
   tripDurationMin: number = 1,
-  tripDurationMax: number = 3
+  tripDurationMax: number = 3,
+  userPreferences?: any
 ): Promise<DestinationRecommendation[]> {
   try {
     console.log("recommendDestinations called:", { interests, budget, tripDurationDays, tripDurationMin, tripDurationMax });
@@ -538,15 +561,32 @@ export async function recommendDestinations(
       console.log("No existing destinations found");
     }
 
-    const existingDests = existingDestinations
-      .map((d) => `${d.name}, ${d.country}`)
-      .join("; ");
+    let existingDestList = existingDestinations.map((d) => `${d.name}, ${d.country}`);
+    
+    // Include explicitly passed existing destinations from endpoint
+    if (userPreferences?.existingDestinations && Array.isArray(userPreferences.existingDestinations)) {
+      const passedDestNames = userPreferences.existingDestinations.map((d: any) => `${d.name}, ${d.country}`);
+      existingDestList = [...new Set([...existingDestList, ...passedDestNames])];
+    }
+
+    const existingDests = existingDestList.join("; ");
     const budgetPerDay = budget / tripDurationDays;
 
     // Get user preferences and dislikes
-    const { preferences, dislikedNames, dislikedCategories, dislikedTags } = userId
+    let { preferences, dislikedNames, dislikedCategories, dislikedTags } = userId
       ? await getUserPreferencesAndDislikes(userId)
       : { preferences: {}, dislikedNames: [], dislikedCategories: [], dislikedTags: [] };
+
+    // Merge with passed-in preferences
+    if (userPreferences) {
+      preferences = { ...preferences, ...userPreferences };
+      if (userPreferences.dislikes && userPreferences.dislikes.length > 0) {
+        dislikedNames = [...new Set([...dislikedNames, ...userPreferences.dislikes])];
+      }
+      if (userPreferences.cuisinePreferences && userPreferences.cuisinePreferences.length > 0) {
+        dislikedTags = [...new Set([...dislikedTags, ...userPreferences.cuisinePreferences])];
+      }
+    }
 
     // Build exclusions list
     const excludedDests = [...new Set([
@@ -560,6 +600,10 @@ export async function recommendDestinations(
     
     const budgetSenseNote = preferences?.budgetSensitivity
       ? `Accommodation: ${preferences.budgetSensitivity === 'budget' ? 'budget hostels/guesthouses' : preferences.budgetSensitivity === 'luxury' ? 'luxury hotels' : 'mid-range'}`
+      : "";
+
+    const cuisineNote = preferences?.cuisinePreferences && preferences.cuisinePreferences.length > 0
+      ? `Preferred cuisines: ${preferences.cuisinePreferences.join(", ")}`
       : "";
 
     const preferredInterests = (preferences?.interests?.length > 0 
@@ -579,11 +623,12 @@ Criteria:
 - Already going: ${existingDests || "None"}
 ${travelPaceNote}
 ${budgetSenseNote}
+${cuisineNote}
 
 Return 3 complete destinations as JSON array:
-[{"name":"City","country":"Country","description":"Why perfect for interests","latitude":0.0,"longitude":0.0,"confidence":0.9,"reason":"How it fits budget/interests","estimatedBudget":800,"currency":"${currency}"},...]
+[{"name":"City","country":"Country","description":"Why perfect for interests","latitude":0.0,"longitude":0.0,"sourceUrl":"https://en.wikipedia.org/wiki/...","confidence":0.9,"reason":"How it fits budget/interests","estimatedBudget":800,"currency":"${currency}"},...]
 
-MUST RETURN ALL 3. All fields required. Complete info only.`;
+MUST RETURN ALL 3. All fields required. Include sourceUrl as Wikipedia/tourism board URL. Complete info only.`;
 
     console.log("Destination recommendation prompt length:", prompt.length, "chars");
     

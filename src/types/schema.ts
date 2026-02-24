@@ -32,6 +32,8 @@ export const DestinationSchema = z.object({
     description: z.string().optional(),
   })).default([]),
   mainPhotoUrl: z.string().url().optional(),
+  estimatedBudget: z.number().optional(), // Estimated cost from AI recommendation
+  currency: z.string().default("EUR"), // Currency for estimated budget
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 });
@@ -148,6 +150,7 @@ export const ActivityRecommendationSchema = z.object({
   estimatedCost: z.number().optional(),
   currency: z.string().default("EUR"),
   duration: z.string().optional(),
+  sourceUrl: z.string().url().optional(), // Link to activity booking/info (e.g., Google Maps, TripAdvisor)
   confidence: z.number().min(0).max(1), // 0-1 score for how well it matches interests
   reason: z.string(), // Why this was recommended
   createdAt: z.coerce.date(),
@@ -160,6 +163,7 @@ export const DestinationRecommendationSchema = z.object({
   description: z.string(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
+  sourceUrl: z.string().url().optional(), // Link to destination info (e.g., Wikipedia, tourism board)
   confidence: z.number().min(0).max(1),
   reason: z.string(),
   estimatedBudget: z.number().optional(),

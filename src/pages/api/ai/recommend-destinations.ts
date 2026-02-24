@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../auth/[...nextauth]";
+import { authOptions } from "../auth/authConfig";
 import { recommendDestinations, extractUserInterests } from "@/api/ai";
 import { containers } from "@/lib/cosmosdb";
 
@@ -48,6 +48,38 @@ export default async function handler(
       interests = await extractUserInterests(userId);
     }
 
+    // Fetch user preferences to include in recommendations
+    let userPreferences: any = {};
+    try {
+      const { resources: prefs } = await containers.userPreferences.items
+        .query({
+          query: "SELECT * FROM c WHERE c.userId = @userId",
+          parameters: [{ name: "@userId", value: userId }],
+        })
+        .fetchAll();
+
+      if (prefs && prefs.length > 0) {
+        userPreferences = prefs[0];
+        // Merge preferences with provided interests
+        if (userPreferences.interests && userPreferences.interests.length > 0) {
+          interests = [...new Set([...interests, ...userPreferences.interests])];
+        }
+      }
+    } catch (error) {
+      console.log("Could not fetch user preferences, continuing with voting history");
+    }
+
+    // Fetch existing destinations to exclude them from recommendations
+    let existingDestinations: any[] = [];
+    try {
+      const { resources: dests } = await containers.destinations.items
+        .query("SELECT c.name, c.country FROM c WHERE c.status IN ('proposed', 'accepted', 'planned')")
+        .fetchAll();
+      existingDestinations = dests || [];
+    } catch (error) {
+      console.log("Could not fetch existing destinations for exclusion, continuing");
+    }
+
     // Get recommendations from Vertex AI
     const recommendations = await recommendDestinations(
       interests,
@@ -56,7 +88,8 @@ export default async function handler(
       tripDurationDays,
       userId,
       tripDurationMin,
-      tripDurationMax
+      tripDurationMax,
+      { ...userPreferences, existingDestinations }
     );
 
     return res.status(200).json({

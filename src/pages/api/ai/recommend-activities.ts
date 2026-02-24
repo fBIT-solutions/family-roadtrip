@@ -1,6 +1,6 @@
 import { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../auth/[...nextauth]";
+import { authOptions } from "../auth/authConfig";
 import { recommendActivities, extractUserInterests } from "@/api/ai";
 import { containers } from "@/lib/cosmosdb";
 import { Destination } from "@/types/schema";
@@ -46,7 +46,42 @@ export default async function handler(
     const userId = users?.[0]?.id || userEmail;
 
     // Extract user interests from their voted activities
-    const interests = await extractUserInterests(userId);
+    let interests = await extractUserInterests(userId);
+
+    // Fetch user preferences to include in recommendations
+    let userPreferences: any = {};
+    try {
+      const { resources: prefs } = await containers.userPreferences.items
+        .query({
+          query: "SELECT * FROM c WHERE c.userId = @userId",
+          parameters: [{ name: "@userId", value: userId }],
+        })
+        .fetchAll();
+
+      if (prefs && prefs.length > 0) {
+        userPreferences = prefs[0];
+        // Merge preferences with voting history interests
+        if (userPreferences.interests && userPreferences.interests.length > 0) {
+          interests = [...new Set([...interests, ...userPreferences.interests])];
+        }
+      }
+    } catch (error) {
+      console.log("Could not fetch user preferences, continuing with voting history");
+    }
+
+    // Fetch existing activities for this destination to exclude them from recommendations
+    let existingActivityNames: string[] = [];
+    try {
+      const { resources: activities } = await containers.activities.items
+        .query({
+          query: "SELECT c.name FROM c WHERE c.destinationId = @destId AND c.status IN ('planned', 'completed')",
+          parameters: [{ name: "@destId", value: destinationId }],
+        })
+        .fetchAll();
+      existingActivityNames = (activities || []).map((a: any) => a.name);
+    } catch (error) {
+      console.log("Could not fetch existing activities for exclusion, continuing");
+    }
 
     // Get recommendations from Vertex AI
     const recommendations = await recommendActivities(
@@ -54,7 +89,8 @@ export default async function handler(
       interests,
       budget || 50,
       currency,
-      userId
+      userId,
+      { ...userPreferences, existingActivityNames }
     );
 
     return res.status(200).json({

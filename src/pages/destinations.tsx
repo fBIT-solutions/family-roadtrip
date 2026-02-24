@@ -284,6 +284,9 @@ export default function Destinations({
                   description: destination.description,
                   latitude: destination.latitude,
                   longitude: destination.longitude,
+                  estimatedBudget: destination.estimatedBudget,
+                  currency: destination.currency,
+                  urls: destination.urls || [],
                 });
                 setDestinations([response.data, ...destinations]);
               } catch (err) {

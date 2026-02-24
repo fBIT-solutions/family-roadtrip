@@ -69,6 +69,7 @@ export function ActivityRecommendations({
           estimatedCost: recommendation.estimatedCost,
           currency: recommendation.currency,
           duration: recommendation.duration,
+          url: recommendation.sourceUrl,
           destinationId,
         });
 

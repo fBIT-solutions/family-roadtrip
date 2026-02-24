@@ -58,6 +58,9 @@ export function DestinationRecommendations({
           description: recommendation.description,
           latitude: recommendation.latitude,
           longitude: recommendation.longitude,
+          estimatedBudget: recommendation.estimatedBudget,
+          currency: recommendation.currency,
+          urls: recommendation.sourceUrl ? [recommendation.sourceUrl] : [],
         });
 
         // Mark as added
