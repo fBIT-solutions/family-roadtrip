@@ -75,6 +75,33 @@ export default function Home() {
                 <p className="text-gray-600">Tickets, documents, photos</p>
               </div>
             </Link>
+
+            {/* Expenses Card */}
+            <Link href="/expenses">
+              <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer">
+                <div className="text-4xl mb-2">�</div>
+                <h2 className="text-xl font-bold text-gray-800">Expenses</h2>
+                <p className="text-gray-600">Track spending</p>
+              </div>
+            </Link>
+
+            {/* Budgets Card */}
+            <Link href="/budgets">
+              <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer">
+                <div className="text-4xl mb-2">📊</div>
+                <h2 className="text-xl font-bold text-gray-800">Budgets</h2>
+                <p className="text-gray-600">Plan & allocate budget</p>
+              </div>
+            </Link>
+
+            {/* Activities Card */}
+            <Link href="/activities">
+              <div className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer">
+                <div className="text-4xl mb-2">🎯</div>
+                <h2 className="text-xl font-bold text-gray-800">Activities</h2>
+                <p className="text-gray-600">Things to do, voting & planning</p>
+              </div>
+            </Link>
           </div>
 
           {/* Upcoming Events Summary */}

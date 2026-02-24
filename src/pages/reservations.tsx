@@ -16,7 +16,7 @@ export default function Reservations() {
     details: "",
     confirmationNumber: "",
     cost: "",
-    currency: "USD",
+    currency: "EUR",
   });
   const [loading, setLoading] = useState(true);
 
@@ -57,7 +57,7 @@ export default function Reservations() {
         details: "",
         confirmationNumber: "",
         cost: "",
-        currency: "USD",
+        currency: "EUR",
       });
     } catch (error) {
       console.error("Error adding reservation:", error);

@@ -36,8 +36,15 @@ export async function getTimelineEvents(): Promise<TimelineEvent[]> {
 
 export async function getTimelineEvent(id: string): Promise<TimelineEvent | null> {
   try {
-    const { resource } = await containers.timeline.item(id).read();
-    return resource ? TimelineEventSchema.parse(resource) : null;
+    const { resources } = await containers.timeline.items
+      .query({
+        query: `SELECT * FROM c WHERE c.id = @id`,
+        parameters: [{ name: "@id", value: id }],
+      })
+      .fetchAll();
+
+    if (resources.length === 0) return null;
+    return TimelineEventSchema.parse(resources[0]);
   } catch (error) {
     console.error("Error fetching timeline event:", error);
     return null;
@@ -60,7 +67,7 @@ export async function updateTimelineEvent(
       updatedAt: new Date(),
     };
 
-    const { resource } = await containers.timeline.item(id).replace(updated);
+    const { resource } = await containers.timeline.item(id, id).replace(updated);
     return resource ? TimelineEventSchema.parse(resource) : null;
   } catch (error) {
     console.error("Error updating timeline event:", error);
@@ -70,7 +77,10 @@ export async function updateTimelineEvent(
 
 export async function deleteTimelineEvent(id: string): Promise<boolean> {
   try {
-    await containers.timeline.item(id).delete();
+    const timelineEvent = await getTimelineEvent(id);
+    if (!timelineEvent) return false;
+    
+    await containers.timeline.item(id, id).delete();
     return true;
   } catch (error) {
     console.error("Error deleting timeline event:", error);

@@ -36,8 +36,15 @@ export async function getReservations(): Promise<Reservation[]> {
 
 export async function getReservation(id: string): Promise<Reservation | null> {
   try {
-    const { resource } = await containers.trips.item(id).read();
-    return resource ? ReservationSchema.parse(resource) : null;
+    const { resources } = await containers.trips.items
+      .query({
+        query: `SELECT * FROM c WHERE c.id = @id`,
+        parameters: [{ name: "@id", value: id }],
+      })
+      .fetchAll();
+
+    if (resources.length === 0) return null;
+    return ReservationSchema.parse(resources[0]);
   } catch (error) {
     console.error("Error fetching reservation:", error);
     return null;
@@ -60,7 +67,7 @@ export async function updateReservation(
       updatedAt: new Date(),
     };
 
-    const { resource } = await containers.trips.item(id).replace(updated);
+    const { resource } = await containers.trips.item(id, id).replace(updated);
     return resource ? ReservationSchema.parse(resource) : null;
   } catch (error) {
     console.error("Error updating reservation:", error);
@@ -70,7 +77,10 @@ export async function updateReservation(
 
 export async function deleteReservation(id: string): Promise<boolean> {
   try {
-    await containers.trips.item(id).delete();
+    const reservation = await getReservation(id);
+    if (!reservation) return false;
+    
+    await containers.trips.item(id, id).delete();
     return true;
   } catch (error) {
     console.error("Error deleting reservation:", error);

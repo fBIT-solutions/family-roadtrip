@@ -11,6 +11,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { id } = req.query;
+  const action = Array.isArray(req.query.action) ? req.query.action[0] : req.query.action;
 
   if (req.method === "GET") {
     try {
@@ -42,7 +43,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } catch (error) {
       res.status(500).json({ error: "Failed to delete destination" });
     }
-  } else if (req.method === "POST" && req.query.action === "vote") {
+  } else if (req.method === "POST" && action === "vote") {
     try {
       const success = await destinationApi.voteForDestination(
         id as string,
@@ -53,6 +54,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
       res.status(200).json({ success: true });
     } catch (error) {
+      console.error("Vote error:", error);
       res.status(500).json({ error: "Failed to vote" });
     }
   } else {

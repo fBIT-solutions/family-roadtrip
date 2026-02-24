@@ -29,17 +29,33 @@ export async function getDestinations(): Promise<Destination[]> {
       .query("SELECT * FROM c ORDER BY c.votes DESC")
       .fetchAll();
 
-    return resources.map((r) => DestinationSchema.parse(r));
+    console.log(`Fetched ${resources.length} destinations from database`);
+    const parsed = resources.map((r) => {
+      try {
+        return DestinationSchema.parse(r);
+      } catch (parseError) {
+        console.error("Error parsing destination:", r, parseError);
+        throw parseError;
+      }
+    });
+    return parsed;
   } catch (error) {
     console.error("Error fetching destinations:", error);
-    return [];
+    throw error;
   }
 }
 
 export async function getDestination(id: string): Promise<Destination | null> {
   try {
-    const { resource } = await containers.destinations.item(id).read();
-    return resource ? DestinationSchema.parse(resource) : null;
+    const { resources } = await containers.destinations.items
+      .query({
+        query: `SELECT * FROM c WHERE c.id = @id`,
+        parameters: [{ name: "@id", value: id }],
+      })
+      .fetchAll();
+
+    if (resources.length === 0) return null;
+    return DestinationSchema.parse(resources[0]);
   } catch (error) {
     console.error("Error fetching destination:", error);
     return null;
@@ -62,7 +78,9 @@ export async function updateDestination(
       updatedAt: new Date(),
     };
 
-    const { resource } = await containers.destinations.item(id).replace(updated);
+    const { resource } = await containers.destinations
+      .item(id, id)
+      .replace(updated);
     return resource ? DestinationSchema.parse(resource) : null;
   } catch (error) {
     console.error("Error updating destination:", error);
@@ -72,7 +90,9 @@ export async function updateDestination(
 
 export async function voteForDestination(id: string, userId: string): Promise<boolean> {
   try {
+    console.log(`Voting on destination ${id} by user ${userId}`);
     const destination = await getDestination(id);
+    console.log(`Destination found:`, destination ? "yes" : "no");
     if (!destination) return false;
 
     if (destination.votedBy.includes(userId)) {
@@ -86,7 +106,9 @@ export async function voteForDestination(id: string, userId: string): Promise<bo
     }
 
     destination.updatedAt = new Date();
-    await containers.destinations.item(id).replace(destination);
+    console.log(`Updating destination with votes: ${destination.votes}`);
+    await containers.destinations.item(id, id).replace(destination);
+    console.log("Vote saved successfully");
     return true;
   } catch (error) {
     console.error("Error voting for destination:", error);
@@ -96,7 +118,10 @@ export async function voteForDestination(id: string, userId: string): Promise<bo
 
 export async function deleteDestination(id: string): Promise<boolean> {
   try {
-    await containers.destinations.item(id).delete();
+    const destination = await getDestination(id);
+    if (!destination) return false;
+    
+    await containers.destinations.item(id, id).delete();
     return true;
   } catch (error) {
     console.error("Error deleting destination:", error);

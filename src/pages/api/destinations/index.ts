@@ -7,15 +7,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   const session = await getServerSession(req, res, authOptions);
 
   if (!session) {
-    return res.status(401).json({ error: "Unauthorized" });
+    console.error("No session found - Authorization required");
+    return res.status(401).json({ error: "Unauthorized", details: "No valid session" });
   }
+
+  console.log(`Destinations API called by: ${session.user?.email}`);
 
   if (req.method === "GET") {
     try {
       const destinations = await destinationApi.getDestinations();
+      console.log(`Returning ${destinations.length} destinations`);
       res.status(200).json(destinations);
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch destinations" });
+      console.error("API Error fetching destinations:", error);
+      res.status(500).json({ error: "Failed to fetch destinations", details: String(error) });
     }
   } else if (req.method === "POST") {
     try {

@@ -57,9 +57,29 @@ export async function getFilesByCategory(
   }
 }
 
+export async function getFile(fileId: string): Promise<FileMetadata | null> {
+  try {
+    const { resources } = await containers.files.items
+      .query({
+        query: `SELECT * FROM c WHERE c.id = @id`,
+        parameters: [{ name: "@id", value: fileId }],
+      })
+      .fetchAll();
+
+    if (resources.length === 0) return null;
+    return FileMetadataSchema.parse(resources[0]);
+  } catch (error) {
+    console.error("Error fetching file:", error);
+    return null;
+  }
+}
+
 export async function deleteFile(fileId: string): Promise<boolean> {
   try {
-    await containers.files.item(fileId).delete();
+    const file = await getFile(fileId);
+    if (!file) return false;
+    
+    await containers.files.item(fileId, fileId).delete();
     return true;
   } catch (error) {
     console.error("Error deleting file:", error);
