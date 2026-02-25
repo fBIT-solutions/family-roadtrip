@@ -27,7 +27,7 @@ export async function getReservations(): Promise<Reservation[]> {
       .query("SELECT * FROM c ORDER BY c.startDate ASC")
       .fetchAll();
 
-    return resources.map((r) => ReservationSchema.parse(r));
+    return resources.map((r: any) => ReservationSchema.parse(r));
   } catch (error) {
     console.error("Error fetching reservations:", error);
     return [];

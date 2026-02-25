@@ -408,6 +408,15 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     };
   }
 
+  // Skip data fetching if Cosmos DB env vars are not available (build time)
+  if (!process.env.AZURE_COSMOS_ENDPOINT || !process.env.AZURE_COSMOS_KEY) {
+    return {
+      props: {
+        initialDestinations: [],
+      },
+    };
+  }
+
   try {
     const initialDestinations = await destinationApi.getDestinations();
     // Convert Date objects to ISO strings for serialization

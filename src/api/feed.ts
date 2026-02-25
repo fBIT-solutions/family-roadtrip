@@ -45,7 +45,7 @@ export async function getFeedPostsByTripId(tripId: string): Promise<FeedPost[]> 
       })
       .fetchAll();
 
-    return resources.map((r) => ({
+    return resources.map((r: any) => ({
       ...r,
       createdAt: new Date(r.createdAt),
       updatedAt: new Date(r.updatedAt),

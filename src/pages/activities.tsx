@@ -671,6 +671,18 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
   const { tripId } = context.query;
 
+  // Skip data fetching if Cosmos DB env vars are not available (build time)
+  if (!process.env.AZURE_COSMOS_ENDPOINT || !process.env.AZURE_COSMOS_KEY) {
+    return {
+      props: {
+        initialActivities: [],
+        initialDestinations: [],
+        initialTrip: null,
+        allTrips: [],
+      },
+    };
+  }
+
   try {
     const promises: Promise<any>[] = [
       activitiesApi.getActivities(),

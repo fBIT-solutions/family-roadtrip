@@ -43,7 +43,7 @@ export async function getTrips(createdBy?: string): Promise<Trip[]> {
       .fetchAll();
 
     console.log(`Fetched ${resources.length} trips`);
-    return resources.map((r) => TripSchema.parse(r));
+    return resources.map((r: any) => TripSchema.parse(r));
   } catch (error) {
     console.error("Error fetching trips:", error);
     throw error;

@@ -216,25 +216,25 @@ async function getUserPreferencesAndDislikes(userId: string): Promise<{
       .fetchAll();
 
     const dislikedNames = dislikeResources.map((d: any) => d.name);
-    const dislikedCategories = [
-      ...new Set(
+    const dislikedCategories = Array.from(
+      new Set(
         dislikeResources
           .filter((d: any) => d.category)
-          .map((d: any) => d.category)
-      ),
-    ];
-    const dislikedTags = [
-      ...new Set(
+          .map((d: any) => d.category as string)
+      )
+    );
+    const dislikedTags = Array.from(
+      new Set(
         dislikeResources
           .flatMap((d: any) => d.tags || [])
-      ),
-    ];
+      )
+    );
 
     return {
       preferences,
       dislikedNames,
-      dislikedCategories,
-      dislikedTags,
+      dislikedCategories: dislikedCategories as string[],
+      dislikedTags: dislikedTags as string[],
     };
   } catch (error) {
     console.error("Error getting user preferences:", error);

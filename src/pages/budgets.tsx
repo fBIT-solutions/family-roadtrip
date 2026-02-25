@@ -637,6 +637,16 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     };
   }
 
+  // Skip data fetching if Cosmos DB env vars are not available (build time)
+  if (!process.env.AZURE_COSMOS_ENDPOINT || !process.env.AZURE_COSMOS_KEY) {
+    return {
+      props: {
+        initialTripBudget: null,
+        initialDestinations: [],
+      },
+    };
+  }
+
   try {
     const [tripBudget, allDestinations] = await Promise.all([
       budgetApi.getTripBudget(),

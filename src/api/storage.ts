@@ -54,7 +54,7 @@ export async function getFilesByCategory(
       })
       .fetchAll();
 
-    return resources.map((r) => FileMetadataSchema.parse(r));
+    return resources.map((r: any) => FileMetadataSchema.parse(r));
   } catch (error) {
     console.error("Error fetching files:", error);
     return [];
@@ -70,7 +70,7 @@ export async function getFilesByTripId(tripId: string): Promise<FileMetadata[]> 
       })
       .fetchAll();
 
-    return resources.map((r) => FileMetadataSchema.parse(r));
+    return resources.map((r: any) => FileMetadataSchema.parse(r));
   } catch (error) {
     console.error("Error fetching files for trip:", error);
     return [];
@@ -116,7 +116,7 @@ export async function getFilesByDestinationId(destinationId: string): Promise<Fi
       })
       .fetchAll();
 
-    return resources.map((r) => FileMetadataSchema.parse(r));
+    return resources.map((r: any) => FileMetadataSchema.parse(r));
   } catch (error) {
     console.error("Error fetching files for destination:", error);
     return [];
@@ -132,7 +132,7 @@ export async function getFilesByActivityId(activityId: string): Promise<FileMeta
       })
       .fetchAll();
 
-    return resources.map((r) => FileMetadataSchema.parse(r));
+    return resources.map((r: any) => FileMetadataSchema.parse(r));
   } catch (error) {
     console.error("Error fetching files for activity:", error);
     return [];
@@ -147,7 +147,7 @@ export async function getAllFiles(): Promise<FileMetadata[]> {
       })
       .fetchAll();
 
-    return resources.map((r) => FileMetadataSchema.parse(r));
+    return resources.map((r: any) => FileMetadataSchema.parse(r));
   } catch (error) {
     console.error("Error fetching all files:", error);
     return [];

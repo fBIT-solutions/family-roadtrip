@@ -30,7 +30,7 @@ export async function getDestinations(): Promise<Destination[]> {
       .fetchAll();
 
     console.log(`Fetched ${resources.length} destinations from database`);
-    const parsed = resources.map((r) => {
+    const parsed = resources.map((r: any) => {
       try {
         return DestinationSchema.parse(r);
       } catch (parseError) {
@@ -71,7 +71,7 @@ export async function getDestinationsByTrip(tripId: string): Promise<Destination
       })
       .fetchAll();
 
-    return resources.map((r) => DestinationSchema.parse(r));
+    return resources.map((r: any) => DestinationSchema.parse(r));
   } catch (error) {
     console.error("Error fetching destinations for trip:", error);
     throw error;

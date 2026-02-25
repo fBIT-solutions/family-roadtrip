@@ -27,7 +27,7 @@ export async function getTimelineEvents(): Promise<TimelineEvent[]> {
       .query("SELECT * FROM c ORDER BY c.date ASC")
       .fetchAll();
 
-    return resources.map((r) => TimelineEventSchema.parse(r));
+    return resources.map((r: any) => TimelineEventSchema.parse(r));
   } catch (error) {
     console.error("Error fetching timeline events:", error);
     return [];
