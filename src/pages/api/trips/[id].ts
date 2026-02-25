@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/authConfig";
 import { TripSchema } from "@/types/schema";
 import * as tripsApi from "@/api/trips";
+import { canViewTrip, canEditTrip, canManageTripMembers } from "@/lib/auth-helpers";
 
 // Schema for PUT request - allows partial updates with date coercion
 const UpdateTripSchema = TripSchema.pick({
@@ -26,6 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { id } = req.query;
+  const userEmail = session.user?.email;
 
   if (!id || typeof id !== "string") {
     return res.status(400).json({ error: "Trip ID is required" });
@@ -37,6 +39,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!tripData) {
         return res.status(404).json({ error: "Trip not found" });
       }
+
+      // Check if user has access to this trip
+      if (!canViewTrip(tripData.trip, userEmail)) {
+        return res.status(403).json({ error: "You do not have access to this trip" });
+      }
+
       res.status(200).json(tripData);
     } catch (error) {
       console.error("Error fetching trip:", error);
@@ -44,6 +52,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } else if (req.method === "PUT") {
     try {
+      // First fetch the trip to check permissions
+      const exists = await tripsApi.getTrip(id);
+      if (!exists) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      // Check if user can edit this trip
+      if (!canEditTrip(exists, userEmail)) {
+        return res.status(403).json({ error: "You do not have permission to edit this trip" });
+      }
+
       // Validate and coerce request body
       const validatedData = UpdateTripSchema.parse(req.body);
       const trip = await tripsApi.updateTrip(id, validatedData);
@@ -57,6 +76,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } else if (req.method === "DELETE") {
     try {
+      // First fetch the trip to check permissions
+      const exists = await tripsApi.getTrip(id);
+      if (!exists) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      // Only creator can delete
+      if (!canManageTripMembers(exists, userEmail)) {
+        return res.status(403).json({ error: "Only the trip creator can delete this trip" });
+      }
+
       const success = await tripsApi.deleteTrip(id);
       if (!success) {
         return res.status(404).json({ error: "Trip not found" });

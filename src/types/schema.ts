@@ -21,7 +21,8 @@ export const TripSchema = z.object({
   startDate: z.coerce.date(),
   endDate: z.coerce.date(),
   days: z.number().int().positive(), // Calculated from startDate and endDate
-  people: z.array(z.string()).default([]), // Array of user emails/IDs
+  people: z.array(z.string()).default([]), // Array of user emails - Full travelers
+  viewers: z.array(z.string()).default([]), // Array of user emails - Guest viewers (limited access)
   hasPet: z.boolean().default(false),
   status: z.enum(["planning", "active", "completed", "cancelled"]).default("planning"),
   totalBudget: z.number(),

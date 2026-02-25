@@ -62,6 +62,22 @@ export async function getDestination(id: string): Promise<Destination | null> {
   }
 }
 
+export async function getDestinationsByTrip(tripId: string): Promise<Destination[]> {
+  try {
+    const { resources } = await containers.destinations.items
+      .query({
+        query: `SELECT * FROM c WHERE c.tripId = @tripId ORDER BY c.votes DESC`,
+        parameters: [{ name: "@tripId", value: tripId }],
+      })
+      .fetchAll();
+
+    return resources.map((r) => DestinationSchema.parse(r));
+  } catch (error) {
+    console.error("Error fetching destinations for trip:", error);
+    throw error;
+  }
+}
+
 export async function updateDestination(
   id: string,
   data: Partial<Destination>

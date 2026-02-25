@@ -2,6 +2,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
 import type { NextApiRequest, NextApiResponse } from "next";
 import * as activitiesApi from "@/api/activities";
+import * as tripsApi from "@/api/trips";
+import * as destinationsApi from "@/api/destinations";
+import { canViewTripActivities } from "@/lib/auth-helpers";
 
 type ResponseData = any;
 
@@ -12,17 +15,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     return res.status(401).json({ error: "Unauthorized" });
   }
 
+  const userEmail = session.user?.email;
+
   if (req.method === "GET") {
-    const { destinationId } = req.query;
+    const { destinationId, tripId } = req.query;
 
     try {
+      // If tripId is provided, get all activities for destinations in that trip
+      if (tripId && typeof tripId === "string") {
+        const trip = await tripsApi.getTrip(tripId);
+        if (!trip) {
+          return res.status(404).json({ error: "Trip not found" });
+        }
+
+        // Check if user has access to view activities in this trip
+        if (!canViewTripActivities(trip, userEmail)) {
+          return res.status(403).json({ error: "You do not have access to this trip's activities" });
+        }
+
+        // Get all destinations for this trip
+        const destinations = await destinationsApi.getDestinationsByTrip(tripId);
+        const destinationIds = destinations.map((d) => d.id);
+
+        // Get activities for all these destinations
+        let allActivities: any[] = [];
+        for (const destId of destinationIds) {
+          const activities = await activitiesApi.getActivitiesByDestination(destId);
+          allActivities = allActivities.concat(activities);
+        }
+
+        return res.status(200).json(allActivities);
+      }
+
+      // If destinationId is provided, get activities for that destination
       if (destinationId) {
         const activities = await activitiesApi.getActivitiesByDestination(destinationId as string);
         return res.status(200).json(activities);
-      } else {
-        const activities = await activitiesApi.getActivities();
-        return res.status(200).json(activities);
       }
+
+      // If no filters, return all activities (legacy behavior)
+      const activities = await activitiesApi.getActivities();
+      return res.status(200).json(activities);
     } catch (error) {
       console.error("Error fetching activities:", error);
       return res.status(500).json({ error: "Failed to fetch activities" });

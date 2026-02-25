@@ -2,7 +2,9 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
 import * as expenseApi from "@/api/expenses";
+import * as tripsApi from "@/api/trips";
 import { Expense } from "@/types/schema";
+import { canViewTripExpenses } from "@/lib/auth-helpers";
 
 type ResponseData = Expense | Expense[] | { error: string; details?: string } | { message: string };
 
@@ -17,10 +19,31 @@ export default async function handler(
     return res.status(401).json({ error: "Unauthorized", details: "No valid session" });
   }
 
-  console.log(`Expenses API called by: ${session.user?.email}`);
+  const userEmail = session.user?.email;
+  console.log(`Expenses API called by: ${userEmail}`);
 
   try {
     if (req.method === "GET") {
+      const { tripId } = req.query;
+
+      // If tripId is provided, filter expenses for that trip and check access
+      if (tripId && typeof tripId === "string") {
+        const trip = await tripsApi.getTrip(tripId);
+        if (!trip) {
+          return res.status(404).json({ error: "Trip not found" });
+        }
+
+        // Check if user has access to view expenses in this trip
+        if (!canViewTripExpenses(trip, userEmail)) {
+          return res.status(403).json({ error: "You do not have access to this trip's expenses" });
+        }
+
+        const expenses = await expenseApi.getExpensesByTripId(tripId);
+        console.log(`Retrieved ${expenses.length} expenses for trip ${tripId}`);
+        return res.status(200).json(expenses);
+      }
+
+      // Legacy behavior: get all expenses
       const expenses = await expenseApi.getExpenses();
       console.log(`Retrieved ${expenses.length} expenses`);
       return res.status(200).json(expenses);

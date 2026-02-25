@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../auth/authConfig";
 import * as feedApi from "@/api/feed";
 import * as tripsApi from "@/api/trips";
+import { canViewTripFeed, canPostToTripFeed } from "@/lib/auth-helpers";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -12,14 +13,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { id } = req.query;
+  const userEmail = session.user.email;
 
   if (!id || typeof id !== "string") {
     return res.status(400).json({ error: "Trip ID is required" });
   }
 
-  // Verify trip exists
+  // Verify trip exists and user has access
+  let trip;
   try {
-    const trip = await tripsApi.getTrip(id);
+    trip = await tripsApi.getTrip(id);
     if (!trip) {
       return res.status(404).json({ error: "Trip not found" });
     }
@@ -30,6 +33,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === "GET") {
     try {
+      // Check if user can view trip feed
+      if (!canViewTripFeed(trip, userEmail)) {
+        return res.status(403).json({ error: "Access denied to this trip's feed" });
+      }
+
       const posts = await feedApi.getFeedPostsByTripId(id);
       res.status(200).json(posts);
     } catch (error) {
@@ -38,6 +46,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } else if (req.method === "POST") {
     try {
+      // Check if user can post to trip feed
+      if (!canPostToTripFeed(trip, userEmail)) {
+        return res.status(403).json({ error: "You cannot post to this trip's feed" });
+      }
+
       const { content } = req.body;
 
       if (!content || typeof content !== "string" || content.trim().length === 0) {
@@ -52,7 +65,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         id,
         content.trim(),
         session.user.name || session.user.email,
-        session.user.email
+        userEmail
       );
 
       res.status(201).json(post);
