@@ -25,24 +25,32 @@ export async function createTrip(
   }
 }
 
-export async function getTrips(createdBy?: string): Promise<Trip[]> {
+export async function getTrips(userEmail?: string): Promise<Trip[]> {
   try {
-    let query = "SELECT * FROM c ORDER BY c.startDate DESC";
-    const parameters: any[] = [];
-
-    if (createdBy) {
-      query = "SELECT * FROM c WHERE c.createdBy = @createdBy ORDER BY c.startDate DESC";
-      parameters.push({ name: "@createdBy", value: createdBy });
+    // If no email provided, return all trips (should not happen in production)
+    if (!userEmail) {
+      const { resources } = await containers.trips.items
+        .query("SELECT * FROM c ORDER BY c.startDate DESC")
+        .fetchAll();
+      console.log(`Fetched ${resources.length} trips (no user filter)`);
+      return resources.map((r: any) => TripSchema.parse(r));
     }
+
+    // Get trips where user is creator, traveler, or viewer
+    const query = `SELECT * FROM c WHERE 
+      c.createdBy = @userEmail OR 
+      ARRAY_CONTAINS(c.people, @userEmail) OR 
+      ARRAY_CONTAINS(c.viewers, @userEmail) 
+      ORDER BY c.startDate DESC`;
 
     const { resources } = await containers.trips.items
       .query({
         query,
-        parameters,
+        parameters: [{ name: "@userEmail", value: userEmail }],
       })
       .fetchAll();
 
-    console.log(`Fetched ${resources.length} trips`);
+    console.log(`Fetched ${resources.length} trips for user ${userEmail}`);
     return resources.map((r: any) => TripSchema.parse(r));
   } catch (error) {
     console.error("Error fetching trips:", error);
