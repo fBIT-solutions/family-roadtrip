@@ -121,7 +121,7 @@ export default function Expenses({
     setCategory(expense.category);
     setDate(new Date(expense.date).toISOString().split("T")[0]);
     setNotes(expense.notes || "");
-    setSelectedDestination(expense.destination || "");
+    setSelectedDestination(expense.destinationId || "");
     setEditingId(expense.id);
   };
 
@@ -412,7 +412,7 @@ export default function Expenses({
                         </span>
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">
-                        {getDestinationName(expense.destination)}
+                        {getDestinationName(expense.destinationId)}
                       </td>
                       <td className="px-6 py-4 text-sm font-semibold text-gray-900">
                         {expense.currency} {expense.amount.toFixed(2)}

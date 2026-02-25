@@ -14,6 +14,24 @@ export const UserSchema = z.object({
   updatedAt: z.coerce.date(),
 });
 
+export const TripSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(), // e.g., "Summer 2025 Europe Trip"
+  goal: z.enum(["relaxation", "adventure", "work", "cultural", "food", "family", "other"]),
+  startDate: z.coerce.date(),
+  endDate: z.coerce.date(),
+  days: z.number().int().positive(), // Calculated from startDate and endDate
+  people: z.array(z.string()).default([]), // Array of user emails/IDs
+  hasPet: z.boolean().default(false),
+  status: z.enum(["planning", "active", "completed", "cancelled"]).default("planning"),
+  totalBudget: z.number(),
+  currency: z.string().default("EUR"),
+  createdBy: z.string(), // User email or ID
+  description: z.string().optional(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+});
+
 export const DestinationSchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
@@ -22,6 +40,7 @@ export const DestinationSchema = z.object({
   country: z.string(),
   latitude: z.number().optional(),
   longitude: z.number().optional(),
+  tripId: z.string().uuid().optional(), // Link to trip (can be unassigned)
   status: z.enum(["proposed", "accepted", "planned", "visited"]).default("proposed"),
   addedBy: z.string(), // User ID
   votes: z.number().default(0),
@@ -31,7 +50,7 @@ export const DestinationSchema = z.object({
     url: z.string().url(),
     description: z.string().optional(),
   })).default([]),
-  mainPhotoUrl: z.string().url().optional(),
+  mainPhotoUrl: z.union([z.literal(""), z.string().url()]).optional(),
   estimatedBudget: z.number().optional(), // Estimated cost from AI recommendation
   currency: z.string().default("EUR"), // Currency for estimated budget
   createdAt: z.coerce.date(),
@@ -49,6 +68,7 @@ export const ReservationSchema = z.object({
   confirmationNumber: z.string().optional(),
   cost: z.number().optional(),
   currency: z.string().default("EUR"),
+  tripId: z.string().uuid().optional(), // Link to trip
   createdBy: z.string(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
@@ -59,8 +79,18 @@ export const TimelineEventSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
   date: z.coerce.date(),
+  startDateTime: z.coerce.date().optional(), // For range/flight events
+  endDateTime: z.coerce.date().optional(), // For range/flight events
   type: z.enum(["milestone", "event", "deadline"]),
-  category: z.string().optional(),
+  category: z.string().optional(), // Predefined categories: flight, reservation, activity, etc
+  activityId: z.string().uuid().optional(), // Link to existing activity (for Activity category)
+  flightDetails: z.object({
+    departureFlightNumber: z.string(),
+    departureDateTime: z.coerce.date(),
+    returnFlightNumber: z.string().optional(),
+    returnDateTime: z.coerce.date().optional(),
+  }).optional(), // For flight events
+  tripId: z.string().uuid().optional(), // Link to trip
   completed: z.boolean().default(false),
   createdBy: z.string(),
   createdAt: z.coerce.date(),
@@ -73,8 +103,10 @@ export const FileMetadataSchema = z.object({
   blobUrl: z.string(),
   fileType: z.string(),
   fileSize: z.number(),
-  category: z.enum(["document", "ticket", "picture", "other"]),
-  relatedId: z.string().optional(), // Can link to reservation, destination, etc
+  category: z.enum(["document", "ticket", "picture", "video", "other"]),
+  tripId: z.string().uuid().optional(), // Link to trip
+  destinationId: z.string().uuid().optional(), // Link to destination
+  activityId: z.string().uuid().optional(), // Link to activity
   uploadedBy: z.string(),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
@@ -87,9 +119,10 @@ export const ExpenseSchema = z.object({
   currency: z.string().default("EUR"),
   category: z.enum(["accommodation", "food", "transport", "activity", "shopping", "other"]).default("other"),
   date: z.coerce.date(),
+  tripId: z.string().uuid().optional(), // Link to trip
+  destinationId: z.string().optional(), // Link to destination within trip
   paidBy: z.string(), // User ID
   splitWith: z.array(z.string()).default([]), // Array of user IDs to split with
-  destination: z.string().optional(), // Destination ID
   notes: z.string().optional(),
   receiptUrl: z.string().optional(),
   createdAt: z.coerce.date(),
@@ -127,7 +160,8 @@ export const ActivitySchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   description: z.string().optional(),
-  destinationId: z.string(), // Link to destination
+  destinationId: z.string().uuid().optional(), // Link to destination (optional - can be assigned later)
+  tripId: z.string().uuid().optional(), // Link to trip
   category: z.enum(["outdoor", "cultural", "food", "nightlife", "shopping", "sports", "relaxation", "adventure", "other"]).default("other"),
   url: z.string().url().optional(), // Google Maps, TripAdvisor, etc
   estimatedCost: z.number().optional(),
@@ -137,6 +171,7 @@ export const ActivitySchema = z.object({
   votes: z.number().default(0),
   votedBy: z.array(z.string()).default([]),
   status: z.enum(["suggested", "planned", "completed", "cancelled"]).default("suggested"),
+  eventIds: z.array(z.string().uuid()).default([]), // Links to timeline events
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 });
@@ -213,6 +248,7 @@ export const UserPreferencesSchema = z.object({
 });
 
 export type User = z.infer<typeof UserSchema>;
+export type Trip = z.infer<typeof TripSchema>;
 export type Destination = z.infer<typeof DestinationSchema>;
 export type Reservation = z.infer<typeof ReservationSchema>;
 export type TimelineEvent = z.infer<typeof TimelineEventSchema>;

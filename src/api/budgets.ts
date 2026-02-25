@@ -123,7 +123,7 @@ export async function getDestinationBudgetWithActuals(
   try {
     const expenses = await expenseApi.getExpenses();
     expenses
-      .filter((e) => e.destination === destinationId)
+      .filter((e) => e.destinationId === destinationId)
       .forEach((e) => {
         expenseLines[e.category] = (expenseLines[e.category] || 0) + e.amount;
       });
@@ -283,7 +283,7 @@ export async function calculateBudgetStats() {
   try {
     const expenses = await expenseApi.getExpenses();
     const expensesByDestination = expenses
-      .filter((e) => e.destination) // Only count expenses linked to destinations
+      .filter((e) => e.destinationId) // Only count expenses linked to destinations
       .reduce((sum, e) => sum + e.amount, 0);
     totalActual += expensesByDestination;
   } catch (error) {

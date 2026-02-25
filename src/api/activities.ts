@@ -59,6 +59,7 @@ export async function createActivity(
     votes: 0,
     votedBy: [],
     status: data?.status || "suggested",
+    eventIds: [],
     createdAt: new Date(),
     updatedAt: new Date(),
   };

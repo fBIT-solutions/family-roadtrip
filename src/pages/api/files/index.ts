@@ -20,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === "POST") {
     try {
-      const { filename, fileData, category, relatedId } = req.body;
+      const { filename, fileData, category, tripId, destinationId, activityId } = req.body;
 
       const blob = new Blob([Buffer.from(fileData, "base64")], {
         type: req.body.fileType,
@@ -31,7 +31,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         file,
         category,
         session.user?.email || "",
-        relatedId
+        tripId,
+        destinationId,
+        activityId
       );
 
       res.status(201).json(fileMetadata);
@@ -41,7 +43,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   } else if (req.method === "GET") {
     try {
       const { category } = req.query;
-      const files = await storageApi.getFilesByCategory(category as any);
+      
+      let files;
+      if (category) {
+        files = await storageApi.getFilesByCategory(category as any);
+      } else {
+        // Return all files if no category is specified
+        files = await storageApi.getAllFiles();
+      }
+      
       res.status(200).json(files);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch files" });

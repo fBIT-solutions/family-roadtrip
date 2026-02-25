@@ -35,7 +35,7 @@ export default async function handler(
     }
 
     if (req.method === "PUT") {
-      const { title, amount, currency, category, date, paidBy, splitWith, destination, notes, receiptUrl } = req.body;
+      const { title, amount, currency, category, date, paidBy, splitWith, destinationId, notes, receiptUrl } = req.body;
 
       const updates: Partial<Expense> = {};
       if (title !== undefined) updates.title = title;
@@ -45,7 +45,7 @@ export default async function handler(
       if (date !== undefined) updates.date = new Date(date);
       if (paidBy !== undefined) updates.paidBy = paidBy;
       if (splitWith !== undefined) updates.splitWith = splitWith;
-      if (destination !== undefined) updates.destination = destination;
+      if (destinationId !== undefined) updates.destinationId = destinationId;
       if (notes !== undefined) updates.notes = notes;
       if (receiptUrl !== undefined) updates.receiptUrl = receiptUrl;
 

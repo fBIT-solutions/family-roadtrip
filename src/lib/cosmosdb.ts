@@ -28,6 +28,7 @@ export const containers = {
   recommendActivities: database.container(process.env.AZURE_COSMOS_CONTAINERS_RECOMMEND_ACTIVITIES || "recommend-activities"),
   userPreferences: database.container(process.env.AZURE_COSMOS_CONTAINERS_USER_PREFERENCES || "user-preferences"),
   recommendationDislikes: database.container(process.env.AZURE_COSMOS_CONTAINERS_DISLIKES || "recommendation-dislikes"),
+  feed: database.container(process.env.AZURE_COSMOS_CONTAINERS_FEED || "trip-feed"),
 };
 
 export default client;

@@ -59,9 +59,22 @@ export async function deleteExpense(id: string): Promise<void> {
   console.log(`Deleted expense: ${id}`);
 }
 
+export async function getExpensesByTripId(tripId: string): Promise<Expense[]> {
+  const { resources } = await containers.expenses.items
+    .query({
+      query: `SELECT * FROM c WHERE c.tripId = @tripId ORDER BY c.date DESC`,
+      parameters: [{ name: "@tripId", value: tripId }],
+    })
+    .fetchAll();
+  return resources as Expense[];
+}
+
 export async function getExpensesByDestination(destinationId: string): Promise<Expense[]> {
   const { resources } = await containers.expenses.items
-    .query(`SELECT * FROM c WHERE c.destination = "${destinationId}" ORDER BY c.date DESC`)
+    .query({
+      query: `SELECT * FROM c WHERE c.destinationId = @destinationId ORDER BY c.date DESC`,
+      parameters: [{ name: "@destinationId", value: destinationId }],
+    })
     .fetchAll();
   return resources as Expense[];
 }

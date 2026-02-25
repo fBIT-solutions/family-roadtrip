@@ -710,7 +710,7 @@ export async function extractUserInterests(userId: string): Promise<string[]> {
     const votedActivities = resources as Activity[];
 
     if (votedActivities.length === 0) {
-      return ["adventure", "culture", "food", "relaxation"]; // Default interests
+      return ["relaxation"]; // Default interests
     }
 
     // Extract categories from voted activities
@@ -729,9 +729,9 @@ export async function extractUserInterests(userId: string): Promise<string[]> {
 
     return topCategories.length > 0
       ? topCategories
-      : ["adventure", "culture", "food", "relaxation"];
+      : ["relaxation"];
   } catch (error) {
     console.error("Error extracting user interests:", error);
-    return ["adventure", "culture", "food", "relaxation"]; // Fallback
+    return ["relaxation"]; // Fallback
   }
 }

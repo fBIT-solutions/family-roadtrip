@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSession, signIn } from "next-auth/react";
+import { useRouter } from "next/router";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "./api/auth/[...nextauth]";
 import type { GetServerSideProps } from "next";
 import Link from "next/link";
 import axios from "axios";
-import { Destination } from "@/types/schema";
+import { Destination, FileMetadata } from "@/types/schema";
 import { DestinationMap } from "@/components/DestinationMap";
 import { DestinationRecommendations } from "@/components/DestinationRecommendations";
+import { QuickFileLinks } from "@/components/QuickFileLinks";
 import * as destinationApi from "@/api/destinations";
 
 const statusColors: Record<string, string> = {
@@ -23,6 +25,7 @@ export default function Destinations({
   initialDestinations?: Destination[];
 }) {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [destinations, setDestinations] = useState<Destination[]>(initialDestinations);
   const [newName, setNewName] = useState("");
   const [newPlace, setNewPlace] = useState("");
@@ -36,13 +39,16 @@ export default function Destinations({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const [files, setFiles] = useState<FileMetadata[]>([]);
 
   const fetchDestinations = useCallback(async () => {
     try {
-      const response = await axios.get("/api/destinations", {
-        withCredentials: true,
-      });
-      setDestinations(response.data);
+      const [destRes, filesRes] = await Promise.all([
+        axios.get("/api/destinations", { withCredentials: true }),
+        axios.get("/api/files", { withCredentials: true }),
+      ]);
+      setDestinations(destRes.data);
+      setFiles(filesRes.data);
       setError(null);
       setLoading(false);
     } catch (error) {
@@ -315,7 +321,11 @@ export default function Destinations({
                   <p className="col-span-full text-center text-gray-600">No destinations yet. Be the first to suggest one!</p>
                 ) : (
                   destinations.map((dest) => (
-                    <div key={dest.id} className="bg-white rounded-lg shadow hover:shadow-lg transition overflow-hidden flex flex-col">
+                    <div
+                      key={dest.id}
+                      onClick={() => router.push(`/destinations/${dest.id}`)}
+                      className="bg-white rounded-lg shadow hover:shadow-lg transition overflow-hidden flex flex-col cursor-pointer"
+                    >
                       {dest.mainPhotoUrl && (
                         <img
                           src={dest.mainPhotoUrl}
@@ -353,6 +363,10 @@ export default function Destinations({
                             </div>
                           </div>
                         )}
+
+                        <QuickFileLinks 
+                          files={files.filter(f => f.destinationId === dest.id)} 
+                        />
 
                         <p className="text-xs text-gray-400 mt-3">Added by: {dest.addedBy}</p>
                         

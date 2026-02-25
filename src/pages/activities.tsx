@@ -5,10 +5,11 @@ import { authOptions } from "./api/auth/[...nextauth]";
 import type { GetServerSideProps } from "next";
 import Link from "next/link";
 import axios from "axios";
-import { Activity, Destination } from "@/types/schema";
+import { Activity, Destination, FileMetadata } from "@/types/schema";
 import * as activitiesApi from "@/api/activities";
 import * as destinationApi from "@/api/destinations";
 import { ActivityRecommendations } from "@/components/ActivityRecommendations";
+import { QuickFileLinks } from "@/components/QuickFileLinks";
 
 const activityCategoryColors: Record<string, string> = {
   outdoor: "bg-green-100 text-green-800",
@@ -51,14 +52,21 @@ export default function Activities({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [files, setFiles] = useState<FileMetadata[]>([]);
+  const [activityDestination, setActivityDestination] = useState<string>(""); // For editing/creating activities
 
   const fetchActivities = useCallback(async () => {
-    if (!selectedDestination) return;
     try {
-      const response = await axios.get(
-        `/api/activities?destinationId=${selectedDestination}`
-      );
-      setActivities(response.data);
+      // If destination selected, filter to that destination; otherwise get all
+      const url = selectedDestination 
+        ? `/api/activities?destinationId=${selectedDestination}`
+        : `/api/activities`;
+      const [activitiesRes, filesRes] = await Promise.all([
+        axios.get(url),
+        axios.get("/api/files", { withCredentials: true }),
+      ]);
+      setActivities(activitiesRes.data);
+      setFiles(filesRes.data);
     } catch (err) {
       console.error("Error fetching activities:", err);
       setError("Failed to fetch activities");
@@ -77,8 +85,8 @@ export default function Activities({
   const handleAddActivity = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!name || !selectedDestination) {
-      setError("Activity name and destination are required");
+    if (!name) {
+      setError("Activity name is required");
       return;
     }
 
@@ -86,7 +94,7 @@ export default function Activities({
 
     try {
       if (editingId) {
-        // Update existing activity
+        // Update existing activity - include destination if provided
         await axios.put(`/api/activities/${editingId}`, {
           name,
           description: description || undefined,
@@ -94,14 +102,15 @@ export default function Activities({
           url: url || undefined,
           estimatedCost: estimatedCost ? parseFloat(estimatedCost) : undefined,
           duration: duration || undefined,
+          destinationId: activityDestination || undefined, // Allow updating destination
         });
         fetchActivities();
         setEditingId(null);
       } else {
-        // Create new activity
+        // Create new activity - destination is optional
         const response = await axios.post("/api/activities", {
           name,
-          destinationId: selectedDestination,
+          destinationId: activityDestination || undefined,
           description: description || undefined,
           category,
           url: url || undefined,
@@ -118,6 +127,7 @@ export default function Activities({
       setUrl("");
       setEstimatedCost("");
       setDuration("");
+      setActivityDestination("");
       setError(null);
     } catch (err) {
       console.error("Error saving activity:", err);
@@ -161,6 +171,7 @@ export default function Activities({
     setUrl(activity.url || "");
     setEstimatedCost(activity.estimatedCost?.toString() || "");
     setDuration(activity.duration || "");
+    setActivityDestination(activity.destinationId || ""); // Include destination in edit
     setEditingId(activity.id);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -177,9 +188,10 @@ export default function Activities({
     }
   };
 
-  const filteredActivities = activities.filter(
-    (a) => a.destinationId === selectedDestination
-  );
+  // Filter activities based on selected destination, or show all if none selected
+  const filteredActivities = selectedDestination
+    ? activities.filter((a) => a.destinationId === selectedDestination)
+    : activities;
 
   if (status === "loading") {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -241,9 +253,7 @@ export default function Activities({
           </select>
         </div>
 
-        {selectedDestination && (
-          <>
-            {/* Activity Form */}
+        {/* Activity Form */}
             <div className="bg-white rounded-lg shadow-md p-6 mb-8">
               <h2 className="text-2xl font-bold text-gray-800 mb-4">
                 {editingId ? "Edit Activity" : "Add New Activity"}
@@ -283,6 +293,24 @@ export default function Activities({
                       <option value="relaxation">Relaxation</option>
                       <option value="adventure">Adventure</option>
                       <option value="other">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Destination (optional)
+                    </label>
+                    <select
+                      value={activityDestination}
+                      onChange={(e) => setActivityDestination(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">-- No destination --</option>
+                      {destinations.map((dest) => (
+                        <option key={dest.id} value={dest.id}>
+                          {dest.name} {dest.country ? `(${dest.country})` : ""}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -359,6 +387,7 @@ export default function Activities({
                         setUrl("");
                         setEstimatedCost("");
                         setDuration("");
+                        setActivityDestination("");
                       }}
                       className="px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
                     >
@@ -369,7 +398,8 @@ export default function Activities({
               </form>
             </div>
 
-            {/* AI Recommendations */}
+            {/* AI Recommendations - Only show when a destination is selected */}
+            {selectedDestination && (
             <div className="bg-white rounded-lg shadow-md p-6 mb-8">
               <ActivityRecommendations
                 destinationId={selectedDestination}
@@ -396,12 +426,15 @@ export default function Activities({
                 }}
               />
             </div>
+            )}
 
             {/* Activities List */}
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-2xl font-bold text-gray-800">
-                  Activities in {getDestinationName(selectedDestination)}
+                  {selectedDestination 
+                    ? `Activities in ${getDestinationName(selectedDestination)}`
+                    : "All Activities"}
                 </h2>
                 <span className="text-gray-600 text-sm">
                   {filteredActivities.length} activity{filteredActivities.length !== 1 ? "ies" : ""}
@@ -476,6 +509,10 @@ export default function Activities({
                         </div>
                       )}
 
+                      <QuickFileLinks 
+                        files={files.filter(f => f.activityId === activity.id)} 
+                      />
+
                       <div className="border-t border-gray-200 pt-4 flex items-center justify-between">
                         <div className="flex gap-4">
                           <button
@@ -509,8 +546,6 @@ export default function Activities({
                   ))
               )}
             </div>
-          </>
-        )}
       </div>
     </div>
   );

@@ -8,7 +8,7 @@ export default function Files() {
   const { data: session, status } = useSession();
   const [files, setFiles] = useState<FileMetadata[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [category, setCategory] = useState<"picture" | "document" | "ticket" | "other">(
+  const [category, setCategory] = useState<"picture" | "video" | "document" | "ticket" | "other">(
     "picture"
   );
   const [loading, setLoading] = useState(true);
@@ -104,6 +104,7 @@ export default function Files() {
                 className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="picture">Picture</option>
+                <option value="video">Video</option>
                 <option value="document">Document</option>
                 <option value="ticket">Ticket</option>
                 <option value="other">Other</option>

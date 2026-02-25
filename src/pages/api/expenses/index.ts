@@ -27,7 +27,7 @@ export default async function handler(
     }
 
     if (req.method === "POST") {
-      const { title, amount, currency, category, date, paidBy, splitWith, destination, notes, receiptUrl } = req.body;
+      const { title, amount, currency, category, date, paidBy, splitWith, destinationId, tripId, notes, receiptUrl } = req.body;
 
       if (!title || amount === undefined || !paidBy) {
         return res.status(400).json({ error: "Missing required fields: title, amount, paidBy" });
@@ -41,7 +41,8 @@ export default async function handler(
         date: new Date(date),
         paidBy,
         splitWith: splitWith || [],
-        destination: destination || undefined,
+        destinationId: destinationId || undefined,
+        tripId: tripId || undefined,
         notes: notes || undefined,
         receiptUrl: receiptUrl || undefined,
       });

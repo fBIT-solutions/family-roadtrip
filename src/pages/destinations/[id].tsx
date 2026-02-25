@@ -3,44 +3,86 @@ import { useRouter } from "next/router";
 import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import axios from "axios";
-import { Destination } from "@/types/schema";
+import { Destination, Activity, FileMetadata } from "@/types/schema";
+import { FilesList } from "@/components/FilesList";
 
-export default function EditDestination() {
+interface DestinationData {
+  destination: Destination;
+  activities: Activity[];
+  budget?: {
+    totalBudget: number;
+    spent: number;
+    remaining: number;
+    currency: string;
+    expenses: any[];
+  };
+}
+
+export default function DestinationDetail() {
   const router = useRouter();
   const { id } = router.query;
   const { data: session, status } = useSession();
-  const [destination, setDestination] = useState<Destination | null>(null);
+  const [data, setData] = useState<DestinationData | null>(null);
+  const [files, setFiles] = useState<FileMetadata[]>([]);
   const [loading, setLoading] = useState(true);
-  const [name, setName] = useState("");
-  const [place, setPlace] = useState("");
-  const [country, setCountry] = useState("");
-  const [description, setDescription] = useState("");
-  const [mainPhotoUrl, setMainPhotoUrl] = useState("");
-  const [urls, setUrls] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
-  const [destinationStatus, setDestinationStatus] = useState<"proposed" | "accepted" | "planned" | "visited">("proposed");
+  const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  
+  // Edit form state
+  const [formData, setFormData] = useState({
+    name: "",
+    place: "",
+    country: "",
+    description: "",
+    mainPhotoUrl: "",
+    estimatedBudget: 0,
+    currency: "EUR",
+    urls: [] as string[],
+    latitude: 0,
+    longitude: 0,
+    status: "proposed" as const,
+  });
+  const [urlInput, setUrlInput] = useState("");
 
   useEffect(() => {
     if (id && status === "authenticated") {
-      fetchDestination();
+      fetchData();
+      fetchFiles();
     }
   }, [id, status]);
 
-  const fetchDestination = async () => {
+  const fetchData = async () => {
     try {
-      const response = await axios.get(`/api/destinations/${id}`);
-      setDestination(response.data);
-      setName(response.data.name);
-      setPlace(response.data.place || "");
-      setCountry(response.data.country || "");
-      setDescription(response.data.description || "");
-      setMainPhotoUrl(response.data.mainPhotoUrl || "");
-      setUrls(response.data.urls?.join("\n") || "");
-      setLatitude(response.data.latitude?.toString() || "");
-      setLongitude(response.data.longitude?.toString() || "");
-      setDestinationStatus(response.data.status || "proposed");
+      const [destResponse, activitiesResponse] = await Promise.all([
+        axios.get(`/api/destinations/${id}`),
+        axios.get(`/api/activities`),
+      ]);
+      
+      const destination = destResponse.data;
+      // Filter activities by destinationId
+      const linkedActivities = activitiesResponse.data.filter(
+        (activity: Activity) => activity.destinationId === id
+      );
+      
+      setData({
+        destination,
+        activities: linkedActivities,
+        budget: destination.budget,
+      });
+      setFormData({
+        name: destination.name,
+        place: destination.place,
+        country: destination.country,
+        description: destination.description || "",
+        mainPhotoUrl: destination.mainPhotoUrl || "",
+        estimatedBudget: destination.estimatedBudget || 0,
+        currency: destination.currency || "EUR",
+        urls: destination.urls || [],
+        latitude: destination.latitude || 0,
+        longitude: destination.longitude || 0,
+        status: destination.status,
+      });
+      setUrlInput((destination.urls || []).join("\n"));
     } catch (error) {
       console.error("Error fetching destination:", error);
     } finally {
@@ -48,61 +90,46 @@ export default function EditDestination() {
     }
   };
 
-  // Fetch coordinates from backend API when place/country changes
-  const fetchCoordinates = useCallback(async (placeValue: string, countryValue: string) => {
-    if (!placeValue && !countryValue) return;
-
+  const fetchFiles = async () => {
+    if (!id) return;
     try {
-      const response = await axios.get("/api/coordinates", {
-        params: { place: placeValue, country: countryValue },
-      });
-
-      if (response.data.latitude && response.data.longitude) {
-        setLatitude(response.data.latitude.toString());
-        setLongitude(response.data.longitude.toString());
-        console.log(`Coordinates fetched: ${response.data.latitude}, ${response.data.longitude}`);
-      }
+      const response = await axios.get(`/api/files`);
+      const destinationFiles = response.data.filter(
+        (file: FileMetadata) => file.destinationId === id
+      );
+      setFiles(destinationFiles);
     } catch (error) {
-      console.error("Error fetching coordinates:", error);
-      // Silently fail - user can still enter coordinates manually
+      console.error("Error fetching files:", error);
+      setFiles([]);
     }
-  }, []);
+  };
 
-  // Auto-fetch coordinates when place or country changes
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (place || country) {
-        fetchCoordinates(place, country);
-      }
-    }, 500); // Debounce for 500ms to avoid excessive API calls
+  const handleDeleteFile = async (fileId: string) => {
+    try {
+      await axios.delete(`/api/files/${fileId}`);
+      await fetchFiles();
+    } catch (error) {
+      console.error("Error deleting file:", error);
+    }
+  };
 
-    return () => clearTimeout(timer);
-  }, [place, country, fetchCoordinates]);
-
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async () => {
     setSaving(true);
     try {
-      const urlList = urls
+      const urlList = urlInput
         .split("\n")
         .map((url) => url.trim())
         .filter((url) => url.length > 0);
 
       await axios.put(`/api/destinations/${id}`, {
-        name,
-        place,
-        country,
-        description,
-        mainPhotoUrl: mainPhotoUrl || undefined,
+        ...formData,
         urls: urlList,
-        photos: mainPhotoUrl ? [{ url: mainPhotoUrl }] : [],
-        latitude: latitude ? parseFloat(latitude) : undefined,
-        longitude: longitude ? parseFloat(longitude) : undefined,
-        status: destinationStatus,
       });
-      router.push("/destinations");
+      setIsEditing(false);
+      await fetchData();
     } catch (error) {
       console.error("Error saving destination:", error);
+      alert("Failed to save destination");
     } finally {
       setSaving(false);
     }
@@ -115,6 +142,16 @@ export default function EditDestination() {
       router.push("/destinations");
     } catch (error) {
       console.error("Error deleting destination:", error);
+    }
+  };
+
+  const handleVote = async () => {
+    try {
+      await axios.post(`/api/destinations/${id}/vote`);
+      await fetchData();
+    } catch (error) {
+      console.error("Error voting on destination:", error);
+      alert("Failed to vote on destination");
     }
   };
 
@@ -139,7 +176,7 @@ export default function EditDestination() {
     );
   }
 
-  if (!destination) {
+  if (!data) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <p className="text-gray-600">Destination not found</p>
@@ -147,185 +184,385 @@ export default function EditDestination() {
     );
   }
 
+  const { destination, activities, budget } = data;
   const isOwner = session?.user?.email === destination.addedBy;
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        <Link href="/destinations">
-          <button className="mb-4 px-4 py-2 text-gray-600 hover:text-gray-900">← Back</button>
-        </Link>
+      {/* Header */}
+      <div className="bg-white shadow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex justify-between items-start">
+            <div>
+              <Link href="/destinations">
+                <button className="text-blue-600 hover:text-blue-800 mb-4">← Back to Destinations</button>
+              </Link>
+              <h1 className="text-4xl font-bold text-gray-800">{formData.name}</h1>
+              <p className="text-gray-600 text-lg mt-2">{formData.place}, {formData.country}</p>
+              <div className="flex gap-4 mt-4">
+                <button
+                  onClick={handleVote}
+                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                >
+                  👍 Vote ({destination.votes})
+                </button>
+              </div>
+            </div>
+            {isOwner && (
+              <button
+                onClick={() => setIsEditing(!isEditing)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                {isEditing ? "Cancel" : "✏️ Edit"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
 
-        <h1 className="text-3xl font-bold text-gray-800 mb-8">
-          {isOwner ? "Edit" : "View"} Destination
-        </h1>
-
-        {!isOwner && (
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <p className="text-blue-800">You can only edit destinations you created.</p>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Main Photo */}
+        {formData.mainPhotoUrl && (
+          <div className="mb-8 rounded-lg overflow-hidden shadow">
+            <img
+              src={formData.mainPhotoUrl}
+              alt={formData.name}
+              className="w-full h-96 object-cover"
+            />
           </div>
         )}
 
-        <div className="bg-white p-6 rounded-lg shadow">
-          {mainPhotoUrl && (
-            <img
-              src={mainPhotoUrl}
-              alt={name}
-              className="w-full h-64 object-cover rounded-lg mb-6"
-            />
-          )}
-
-          <form onSubmit={handleSave} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Destination Name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                disabled={!isOwner}
-                required
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Location
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="text"
-                  placeholder="Place/City"
-                  value={place}
-                  onChange={(e) => setPlace(e.target.value)}
-                  disabled={!isOwner}
-                  required
-                  className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                />
-                <input
-                  type="text"
-                  placeholder="Country"
-                  value={country}
-                  onChange={(e) => setCountry(e.target.value)}
-                  disabled={!isOwner}
-                  required
-                  className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Status
-              </label>
-              <select
-                value={destinationStatus}
-                onChange={(e) => setDestinationStatus(e.target.value as any)}
-                disabled={!isOwner}
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-              >
-                <option value="proposed">Proposed</option>
-                <option value="accepted">Accepted</option>
-                <option value="planned">Planned</option>
-                <option value="visited">Visited</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Description
-              </label>
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                disabled={!isOwner}
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 h-24"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Coordinates
-              </label>
-              <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="number"
-                  placeholder="Latitude"
-                  value={latitude}
-                  onChange={(e) => setLatitude(e.target.value)}
-                  disabled={!isOwner}
-                  step="0.0001"
-                  className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                />
-                <input
-                  type="number"
-                  placeholder="Longitude"
-                  value={longitude}
-                  onChange={(e) => setLongitude(e.target.value)}
-                  disabled={!isOwner}
-                  step="0.0001"
-                  className="px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Main Photo URL
-              </label>
-              <input
-                type="url"
-                value={mainPhotoUrl}
-                onChange={(e) => setMainPhotoUrl(e.target.value)}
-                disabled={!isOwner}
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Useful URLs (one per line)
-              </label>
-              <textarea
-                value={urls}
-                onChange={(e) => setUrls(e.target.value)}
-                disabled={!isOwner}
-                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 h-24 font-mono text-sm"
-              />
-            </div>
-
-            {isOwner && (
-              <div className="flex gap-2 pt-4">
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {saving ? "Saving..." : "Save Changes"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDelete}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-                >
-                  Delete
-                </button>
+        {/* Description and URLs Section */}
+        {!isEditing && (
+          <>
+            {formData.description && (
+              <div className="bg-white rounded-lg shadow p-6 mb-8">
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">About This Destination</h2>
+                <p className="text-gray-700 text-lg leading-relaxed">{formData.description}</p>
               </div>
             )}
-          </form>
+            
+            {formData.urls && formData.urls.length > 0 && (
+              <div className="bg-white rounded-lg shadow p-6 mb-8">
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">Useful Links</h2>
+                <div className="space-y-3">
+                  {formData.urls.map((url, idx) => (
+                    <a
+                      key={idx}
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 text-blue-600 hover:text-blue-800 break-all"
+                    >
+                      <span>🔗</span>
+                      <span className="hover:underline">{url}</span>
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        )}
 
-          <div className="mt-6 pt-6 border-t">
-            <p className="text-sm text-gray-500">
-              Added by: {destination.addedBy}
-            </p>
-            <p className="text-sm text-gray-500">
-              Votes: {destination.votes}
-            </p>
-            <p className="text-sm text-gray-500">
-              Status: {destination.status}
-            </p>
+        {/* Edit Form */}
+        {isEditing && isOwner && (
+          <div className="bg-white p-6 rounded-lg shadow mb-8 space-y-4">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Edit Destination Details</h2>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Name *</label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+                <select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="proposed">Proposed</option>
+                  <option value="accepted">Accepted</option>
+                  <option value="planned">Planned</option>
+                  <option value="visited">Visited</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Place *</label>
+                <input
+                  type="text"
+                  value={formData.place}
+                  onChange={(e) => setFormData({ ...formData, place: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Country *</label>
+                <input
+                  type="text"
+                  value={formData.country}
+                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Estimated Budget</label>
+                <input
+                  type="number"
+                  value={formData.estimatedBudget}
+                  onChange={(e) => setFormData({ ...formData, estimatedBudget: +e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Currency</label>
+                <select
+                  value={formData.currency}
+                  onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option>EUR</option>
+                  <option>USD</option>
+                  <option>GBP</option>
+                  <option>JPY</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">Main Photo URL</label>
+              <input
+                type="url"
+                value={formData.mainPhotoUrl}
+                onChange={(e) => setFormData({ ...formData, mainPhotoUrl: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">URLs (one per line)</label>
+              <textarea
+                value={urlInput}
+                onChange={(e) => setUrlInput(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16 font-mono text-sm"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Latitude</label>
+                <input
+                  type="number"
+                  value={formData.latitude}
+                  onChange={(e) => setFormData({ ...formData, latitude: +e.target.value })}
+                  step="0.000001"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Longitude</label>
+                <input
+                  type="number"
+                  value={formData.longitude}
+                  onChange={(e) => setFormData({ ...formData, longitude: +e.target.value })}
+                  step="0.000001"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                {saving ? "Saving..." : "Save Changes"}
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left Column - Activities */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">Linked Activities</h2>
+              <Link href={`/activities?destinationId=${id}`}>
+                <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                  + Add Activity
+                </button>
+              </Link>
+            </div>
+            
+            {activities.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No activities yet</p>
+            ) : (
+              <div className="space-y-4">
+                {activities.map((activity) => (
+                  <div key={activity.id} className="p-4 border border-gray-200 rounded-lg hover:border-blue-400 transition">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-gray-800">{activity.name}</h3>
+                        <p className="text-sm text-gray-600 mt-1">{activity.description}</p>
+                        <div className="flex gap-2 mt-2 text-sm">
+                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded capitalize">{activity.category}</span>
+                          {activity.duration && (
+                            <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded">{activity.duration}</span>
+                          )}
+                        </div>
+                        {activity.estimatedCost && (
+                          <p className="text-sm text-gray-700 mt-2">💰 {activity.currency} {activity.estimatedCost.toLocaleString()}</p>
+                        )}
+                      </div>
+                      <Link href={`/activities/${activity.id}`}>
+                        <button className="text-blue-600 hover:text-blue-800 text-sm">View</button>
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Right Column - Budget */}
+          <div className="bg-white rounded-lg shadow p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Budget</h2>
+            
+            {formData.estimatedBudget ? (
+              <div className="space-y-6">
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <p className="text-sm text-gray-600">Estimated Budget</p>
+                  <p className="text-3xl font-bold text-blue-600">{formData.currency} {formData.estimatedBudget.toLocaleString()}</p>
+                </div>
+
+                {budget ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-4 bg-green-50 rounded-lg">
+                        <p className="text-sm text-gray-600">Remaining</p>
+                        <p className="text-2xl font-bold text-green-600">{budget.currency} {budget.remaining.toLocaleString()}</p>
+                      </div>
+                      <div className="p-4 bg-orange-50 rounded-lg">
+                        <p className="text-sm text-gray-600">Spent</p>
+                        <p className="text-2xl font-bold text-orange-600">{budget.currency} {budget.spent.toLocaleString()}</p>
+                      </div>
+                    </div>
+
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div
+                        className="bg-orange-500 h-3 rounded-full transition-all"
+                        style={{ width: `${Math.min((budget.spent / budget.totalBudget) * 100, 100)}%` }}
+                      />
+                    </div>
+
+                    {budget.expenses && budget.expenses.length > 0 && (
+                      <div>
+                        <h3 className="font-semibold text-gray-800 mb-3">Recent Expenses</h3>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {budget.expenses.slice(0, 5).map((expense: any, idx: number) => (
+                            <div key={idx} className="flex justify-between text-sm">
+                              <span className="text-gray-700">{expense.description}</span>
+                              <span className="text-gray-600">{budget.currency} {expense.amount}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <Link href={`/budgets?destinationId=${id}`}>
+                      <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        Manage Budget
+                      </button>
+                    </Link>
+                  </>
+                ) : (
+                  <div className="p-4 bg-gray-50 rounded-lg text-center">
+                    <p className="text-gray-600 mb-4">No budget tracking started yet</p>
+                    <Link href={`/budgets?destinationId=${id}`}>
+                      <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                        Start Tracking
+                      </button>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="p-4 bg-gray-50 rounded-lg text-center">
+                <p className="text-gray-600">Set an estimated budget above to track expenses</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Files Section */}
+        {files.length > 0 && (
+          <div className="bg-white rounded-lg shadow p-6 mt-8">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">📄 DESTINATION FILES</h2>
+            <FilesList 
+              files={files} 
+              onDelete={handleDeleteFile}
+            />
+          </div>
+        )}
+
+        {/* Additional Info */}
+        <div className="bg-white rounded-lg shadow p-6 mt-8">
+          <h2 className="text-xl font-bold text-gray-800 mb-4">Details</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div>
+              <p className="text-gray-600">Status</p>
+              <p className={`font-semibold capitalize ${
+                formData.status === "proposed" ? "text-yellow-600" :
+                formData.status === "accepted" ? "text-green-600" :
+                formData.status === "planned" ? "text-blue-600" :
+                "text-purple-600"
+              }`}>{formData.status}</p>
+            </div>
+            <div>
+              <p className="text-gray-600">Votes</p>
+              <p className="font-semibold">{destination.votes}</p>
+            </div>
+            <div>
+              <p className="text-gray-600">Added By</p>
+              <p className="font-semibold text-xs">{destination.addedBy}</p>
+            </div>
+            {destination.latitude && destination.longitude && (
+              <div>
+                <p className="text-gray-600">Coordinates</p>
+                <p className="font-semibold text-xs">{destination.latitude.toFixed(4)}, {destination.longitude.toFixed(4)}</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
