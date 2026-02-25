@@ -447,14 +447,14 @@ export default function TripDetails() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="flex justify-between items-start gap-4 mb-4">
-            <div>
-              <h1 className="text-4xl font-bold text-gray-800">{trip.name}</h1>
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
+            <div className="w-full">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800">{trip.name}</h1>
               <p className="text-gray-600 mt-2">{trip.description}</p>
-              <div className="flex gap-4 mt-4 text-sm text-gray-700">
+              <div className="flex flex-wrap gap-2 sm:gap-4 mt-4 text-xs sm:text-sm text-gray-700">
                 <span>📅 {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}</span>
-                <span>⏱️ {trip.days} days</span>
+                <span>⏱️ {trip.days}d</span>
                 <span>🎯 {trip.goal}</span>
                 <span className={`px-2 py-1 rounded font-semibold ${
                   trip.status === "planning" ? "bg-yellow-100 text-yellow-800" :
@@ -466,36 +466,36 @@ export default function TripDetails() {
                 </span>
               </div>
             </div>
-            <div className="flex gap-2 flex-col sm:flex-row">
-              <Link href="/">
-                <button className="px-4 py-2 bg-gray-300 rounded hover:bg-gray-400 whitespace-nowrap">← Back</button>
+            <div className="flex gap-2 flex-col sm:flex-row w-full sm:w-auto">
+              <Link href="/" className="w-full sm:w-auto">
+                <button className="w-full px-3 py-2 text-sm sm:text-base bg-gray-300 rounded hover:bg-gray-400 whitespace-nowrap">← Back</button>
               </Link>
               <button 
                 onClick={() => setShowEditModal(true)}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 whitespace-nowrap">
-                ✏️ Edit Trip
+                className="w-full sm:w-auto px-3 py-2 text-sm sm:text-base bg-blue-600 text-white rounded hover:bg-blue-700 whitespace-nowrap">
+                ✏️ Edit
               </button>
             </div>
           </div>
-          <div className="flex gap-2 flex-wrap">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:gap-2 lg:flex-wrap gap-2 mt-4">
             <button 
               onClick={() => setShowFileModal(true)}
-              className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 whitespace-nowrap">
-              📎 Add Files
+              className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-orange-600 text-white rounded hover:bg-orange-700">
+              📎 Files
             </button>
             <button 
               onClick={() => setShowMediaModal(true)}
-              className="px-4 py-2 bg-pink-600 text-white rounded hover:bg-pink-700 whitespace-nowrap">
-              📸 Upload Media
+              className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-pink-600 text-white rounded hover:bg-pink-700">
+              📸 Media
             </button>
             <button 
               onClick={() => setShowExpenseModal(true)}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 whitespace-nowrap">
-              💰 Add Expense
+              className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-green-600 text-white rounded hover:bg-green-700">
+              💰 Expense
             </button>
-            <Link href={`/trips/${trip.id}/destinations`}>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 whitespace-nowrap">
-                🌍 Manage Destinations
+            <Link href={`/trips/${trip.id}/destinations`} className="col-span-1">
+              <button className="w-full px-2 py-2 text-xs sm:text-sm sm:px-4 bg-blue-600 text-white rounded hover:bg-blue-700">
+                🌍 Destinations
               </button>
             </Link>
             <button
@@ -503,8 +503,8 @@ export default function TripDetails() {
                 setSelectedActivityDestination(destinations.length > 0 ? destinations[0].id : "");
                 setShowAddActivityModal(true);
               }}
-              className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 whitespace-nowrap">
-              ➕ Add Activity
+              className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-purple-600 text-white rounded hover:bg-purple-700">
+              ➕ Activity
             </button>
           </div>
         </div>
@@ -515,7 +515,7 @@ export default function TripDetails() {
         <div className="mb-8">
           <div className="border-2 border-gray-200 rounded-lg p-6 bg-white">
             <h2 className="text-2xl font-bold text-gray-800 mb-4">TRIP DETAILS</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
               <div>
                 <p className="text-gray-600 text-sm">Duration</p>
                 <p className="text-xl font-semibold text-gray-800">{trip.days} days</p>
@@ -537,7 +537,7 @@ export default function TripDetails() {
         </div>
 
         {/* Main Grid Layout */}
-        <div className="grid grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
           {/* Trip Schedule */}
           <div className="bg-white rounded-lg shadow p-6 border-t-4 border-orange-500">
             <h3 className="text-xl font-bold text-gray-800 mb-4">📅 TRIP SCHEDULE</h3>

@@ -236,23 +236,23 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
       <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-blue-600">🚗 Trip Planner</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-blue-600">🚗 Trip Planner</h1>
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 sm:gap-4">
               {session ? (
                 <>
-                  <span className="text-gray-700">Welcome, {session.user?.name}</span>
+                  <span className="text-xs sm:text-sm text-gray-700 hidden sm:block">Welcome, {session.user?.name}</span>
                   <Link href="/preferences">
-                    <button className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">
+                    <button className="px-2 sm:px-4 py-2 text-xs sm:text-sm bg-purple-600 text-white rounded hover:bg-purple-700">
                       ⚙️ Preferences
                     </button>
                   </Link>
                   <button
                     onClick={() => signOut()}
-                    className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
+                    className="px-2 sm:px-4 py-2 text-xs sm:text-sm bg-red-500 text-white rounded hover:bg-red-600"
                   >
                     Sign Out
                   </button>
@@ -260,7 +260,7 @@ export default function Home() {
               ) : (
                 <button
                   onClick={() => signIn()}
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
                   Sign In
                 </button>
@@ -271,27 +271,27 @@ export default function Home() {
       </nav>
 
       {session ? (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex justify-between items-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-800">My Trips</h2>
-            <div className="flex gap-3">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-8 sm:py-12">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">My Trips</h2>
+            <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
               <button
                 onClick={() => setShowAddDestinationModal(true)}
-                className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
+                className="flex-1 sm:flex-initial px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-base bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
               >
-                + Add Destination
+                + Destination
               </button>
               <button
                 onClick={() => setShowAddActivityModal(true)}
-                className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold"
+                className="flex-1 sm:flex-initial px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-base bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold"
               >
-                + Add Activity
+                + Activity
               </button>
               <button
                 onClick={() => setShowCreateModal(true)}
-                className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
+                className="flex-1 sm:flex-initial px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-base bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
               >
-                + Create New Trip
+                + Trip
               </button>
             </div>
           </div>
@@ -354,14 +354,14 @@ export default function Home() {
           )}
         </div>
       ) : (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 text-center">
-          <h2 className="text-3xl font-bold text-gray-800 mb-4">Plan Your Trips</h2>
-          <p className="text-xl text-gray-600 mb-8">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-12 sm:py-16 text-center">
+          <h2 className="text-2xl sm:text-4xl font-bold text-gray-800 mb-4">Plan Your Trips</h2>
+          <p className="text-lg sm:text-xl text-gray-600 mb-8">
             Sign in to start planning your adventures!
           </p>
           <button
             onClick={() => signIn()}
-            className="px-8 py-3 bg-blue-600 text-white text-lg rounded-lg hover:bg-blue-700"
+            className="px-6 sm:px-8 py-3 sm:py-4 bg-blue-600 text-white text-base sm:text-lg rounded-lg hover:bg-blue-700"
           >
             Sign In to Get Started
           </button>

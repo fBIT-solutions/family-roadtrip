@@ -142,22 +142,22 @@ export default function Destinations({
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto px-4 py-8">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
         <Link href="/">
-          <button className="mb-4 px-4 py-2 text-gray-600 hover:text-gray-900">← Back</button>
+          <button className="mb-4 px-3 sm:px-4 py-2 text-sm sm:text-base text-gray-600 hover:text-gray-900">← Back</button>
         </Link>
 
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800">🌍 Destination Ideas</h1>
-          <div className="flex gap-2">
-            <Link href="/preferences">
-              <button className="px-4 py-2 rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">🌍 Destinations</h1>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Link href="/preferences" className="flex-1 sm:flex-initial">
+              <button className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition">
                 ⚙️ Preferences
               </button>
             </Link>
             <button
               onClick={() => setViewMode("list")}
-              className={`px-4 py-2 rounded-lg ${
+              className={`flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg ${
                 viewMode === "list"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-200 text-gray-800 hover:bg-gray-300"
@@ -167,7 +167,7 @@ export default function Destinations({
             </button>
             <button
               onClick={() => setViewMode("map")}
-              className={`px-4 py-2 rounded-lg ${
+              className={`flex-1 sm:flex-initial px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg ${
                 viewMode === "map"
                   ? "bg-blue-600 text-white"
                   : "bg-gray-200 text-gray-800 hover:bg-gray-300"
