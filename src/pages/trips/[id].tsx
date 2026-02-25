@@ -133,17 +133,11 @@ export default function TripDetails() {
     try {
       const [tripResponse, activitiesResponse] = await Promise.all([
         axios.get(`/api/trips/${id}`),
-        axios.get(`/api/activities`),
+        axios.get(`/api/activities?tripId=${id}`),
       ]);
       
       setTripData(tripResponse.data);
-      
-      // Filter activities for this trip's destinations
-      const tripDestinations = tripResponse.data.destinations;
-      const tripActivities = activitiesResponse.data.filter((activity: Activity) =>
-        tripDestinations.some((dest: Destination) => dest.id === activity.destinationId)
-      );
-      setActivities(tripActivities);
+      setActivities(activitiesResponse.data);
       
       // Initialize edit form with trip data
       const trip = tripResponse.data.trip;

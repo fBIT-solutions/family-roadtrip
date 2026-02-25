@@ -2,6 +2,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
 import * as storageApi from "@/api/storage";
+import * as tripsApi from "@/api/trips";
+import { canViewTripFiles } from "@/lib/auth-helpers";
 
 export const config = {
   api: {
@@ -18,6 +20,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(401).json({ error: "Unauthorized" });
   }
 
+  const userEmail = session.user?.email;
+
   if (req.method === "POST") {
     try {
       const { filename, fileData, category, tripId, destinationId, activityId } = req.body;
@@ -30,7 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const fileMetadata = await storageApi.uploadFile(
         file,
         category,
-        session.user?.email || "",
+        userEmail || "",
         tripId,
         destinationId,
         activityId
@@ -42,13 +46,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
   } else if (req.method === "GET") {
     try {
-      const { category } = req.query;
+      const { category, tripId } = req.query;
       
+      // If tripId is provided, filter files for that trip and check access
+      if (tripId && typeof tripId === "string") {
+        const trip = await tripsApi.getTrip(tripId);
+        if (!trip) {
+          return res.status(404).json({ error: "Trip not found" });
+        }
+
+        // Check if user has access to view files in this trip
+        if (!canViewTripFiles(trip, userEmail)) {
+          return res.status(403).json({ error: "You do not have access to this trip's files" });
+        }
+
+        const files = await storageApi.getFilesByTripId(tripId);
+        return res.status(200).json(files);
+      }
+
+      // Legacy behavior: get by category
       let files;
       if (category) {
         files = await storageApi.getFilesByCategory(category as any);
       } else {
-        // Return all files if no category is specified
+        // Return all files if no filter is specified
         files = await storageApi.getAllFiles();
       }
       
