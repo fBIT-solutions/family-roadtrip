@@ -30,12 +30,9 @@ export default async function handler(
         return res.status(200).json(budgetStats);
       }
 
-      // Get trip budget
+      // Get trip budget (return null if not found instead of 404)
       const tripBudget = await budgetApi.getTripBudget(tripId);
-      if (!tripBudget) {
-        return res.status(404).json({ error: "Trip budget not found" });
-      }
-      return res.status(200).json(tripBudget);
+      return res.status(200).json(tripBudget || null);
     }
 
     if (req.method === "POST") {

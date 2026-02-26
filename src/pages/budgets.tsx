@@ -63,12 +63,21 @@ export default function Budgets({
     try {
       const query = router.query.tripId ? `?tripId=${router.query.tripId}` : "";
       const response = await axios.get(`/api/budgets/trip${query}`, { withCredentials: true });
-      setTripBudget(response.data);
-      setTotalBudget(response.data.totalBudget.toString());
-      setCurrency(response.data.currency);
-      setNotes(response.data.notes || "");
+      if (response.data) {
+        setTripBudget(response.data);
+        setTotalBudget(response.data.totalBudget.toString());
+        setCurrency(response.data.currency);
+        setNotes(response.data.notes || "");
+      } else {
+        // No budget exists yet for this trip
+        setTripBudget(null);
+        setTotalBudget("");
+        setCurrency("EUR");
+        setNotes("");
+      }
     } catch (err) {
       console.error("Error fetching budget:", err);
+      setTripBudget(null);
     }
   }, [router.query.tripId]);
 
@@ -83,6 +92,15 @@ export default function Budgets({
           unallocated: response.data.unallocated || 0,
           totalActual: response.data.totalActual || 0,
           percentageUsed: response.data.percentageUsed || 0,
+        });
+      } else {
+        // Reset to default values if no budget data
+        setBudgetStats({
+          totalBudget: 0,
+          totalAllocated: 0,
+          unallocated: 0,
+          totalActual: 0,
+          percentageUsed: 0,
         });
       }
     } catch (err) {
