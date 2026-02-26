@@ -1,4 +1,5 @@
 import GitHubProvider from "next-auth/providers/github";
+import GoogleProvider from "next-auth/providers/google";
 import { type JWT } from "next-auth/jwt";
 import { type Session } from "next-auth";
 import { type Account, type NextAuthOptions } from "next-auth";
@@ -8,6 +9,10 @@ export const authOptions: NextAuthOptions = {
     GitHubProvider({
       clientId: process.env.GITHUB_ID || "",
       clientSecret: process.env.GITHUB_SECRET || "",
+    }),
+    GoogleProvider({
+      clientId: process.env.GOOGLE_ID || "",
+      clientSecret: process.env.GOOGLE_SECRET || "",
     }),
   ],
   pages: {
