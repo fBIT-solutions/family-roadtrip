@@ -9,7 +9,10 @@ export async function getTripBudget(tripId?: string): Promise<TripBudget | null>
     if (tripId) {
       // If tripId is provided, fetch the budget for that specific trip
       const { resources } = await containers.budgets.items
-        .query("SELECT * FROM c WHERE c.tripId = @tripId", { name: "@tripId", value: tripId })
+        .query({
+          query: "SELECT * FROM c WHERE c.tripId = @tripId",
+          parameters: [{ name: "@tripId", value: tripId }],
+        })
         .fetchAll();
       
       if (resources.length === 0) return null;
