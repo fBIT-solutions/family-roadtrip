@@ -4,23 +4,35 @@ import { v4 as uuidv4 } from "uuid";
 import * as expenseApi from "@/api/expenses";
 import * as activitiesApi from "@/api/activities";
 
-export async function getTripBudget(): Promise<TripBudget | null> {
+export async function getTripBudget(tripId?: string): Promise<TripBudget | null> {
   try {
-    const { resources } = await containers.budgets.items
-      .query("SELECT * FROM c WHERE c.id != null")
-      .fetchAll();
-    
-    if (resources.length === 0) return null;
-    return resources[0] as TripBudget;
+    if (tripId) {
+      // If tripId is provided, fetch the budget for that specific trip
+      const { resources } = await containers.budgets.items
+        .query("SELECT * FROM c WHERE c.tripId = @tripId", { name: "@tripId", value: tripId })
+        .fetchAll();
+      
+      if (resources.length === 0) return null;
+      return resources[0] as TripBudget;
+    } else {
+      // Fallback to first budget if no tripId provided (for backward compatibility)
+      const { resources } = await containers.budgets.items
+        .query("SELECT * FROM c WHERE c.id != null")
+        .fetchAll();
+      
+      if (resources.length === 0) return null;
+      return resources[0] as TripBudget;
+    }
   } catch (error) {
     console.error("Error fetching trip budget:", error);
     return null;
   }
 }
 
-export async function createTripBudget(totalBudget: number, currency: string = "EUR", notes?: string): Promise<TripBudget> {
+export async function createTripBudget(tripId: string, totalBudget: number, currency: string = "EUR", notes?: string): Promise<TripBudget> {
   const tripBudget: TripBudget = {
     id: uuidv4(),
+    tripId,
     totalBudget,
     currency,
     destinationBudgets: [],
@@ -255,8 +267,8 @@ export async function deleteBudgetLine(
   return updated;
 }
 
-export async function calculateBudgetStats() {
-  const tripBudget = await getTripBudget();
+export async function calculateBudgetStats(tripId?: string) {
+  const tripBudget = await getTripBudget(tripId);
   
   if (!tripBudget) {
     return {

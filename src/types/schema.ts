@@ -149,6 +149,7 @@ export const DestinationBudgetSchema = z.object({
 
 export const TripBudgetSchema = z.object({
   id: z.string().uuid(),
+  tripId: z.string().uuid(),
   totalBudget: z.number(),
   currency: z.string().default("EUR"),
   destinationBudgets: z.array(DestinationBudgetSchema).default([]),

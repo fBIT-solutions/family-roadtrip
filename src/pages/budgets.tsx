@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSession, signIn } from "next-auth/react";
+import { useRouter } from "next/router";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "./api/auth/[...nextauth]";
 import type { GetServerSideProps } from "next";
@@ -26,6 +27,7 @@ export default function Budgets({
   initialDestinations?: Destination[];
 }) {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [tripBudget, setTripBudget] = useState<TripBudget | null>(initialTripBudget);
   const [destinations, setDestinations] = useState<Destination[]>(initialDestinations);
   const [totalBudget, setTotalBudget] = useState(initialTripBudget?.totalBudget.toString() || "");
@@ -59,7 +61,8 @@ export default function Budgets({
 
   const fetchBudget = useCallback(async () => {
     try {
-      const response = await axios.get("/api/budgets/trip", { withCredentials: true });
+      const query = router.query.tripId ? `?tripId=${router.query.tripId}` : "";
+      const response = await axios.get(`/api/budgets/trip${query}`, { withCredentials: true });
       setTripBudget(response.data);
       setTotalBudget(response.data.totalBudget.toString());
       setCurrency(response.data.currency);
@@ -67,11 +70,12 @@ export default function Budgets({
     } catch (err) {
       console.error("Error fetching budget:", err);
     }
-  }, []);
+  }, [router.query.tripId]);
 
   const fetchStats = useCallback(async () => {
     try {
-      const response = await axios.get("/api/budgets/trip?stats=true", { withCredentials: true });
+      const query = router.query.tripId ? `?tripId=${router.query.tripId}&stats=true` : "?stats=true";
+      const response = await axios.get(`/api/budgets/trip${query}`, { withCredentials: true });
       if (response.data) {
         setBudgetStats({
           totalBudget: response.data.totalBudget || 0,
@@ -92,7 +96,7 @@ export default function Budgets({
         percentageUsed: 0,
       });
     }
-  }, []);
+  }, [router.query.tripId]);
 
   const fetchDestinationActuals = useCallback(
     async (destIds: string[]) => {
@@ -119,9 +123,11 @@ export default function Budgets({
   );
 
   useEffect(() => {
-    fetchBudget();
-    fetchStats();
-  }, [fetchBudget, fetchStats]);
+    if (router.isReady) {
+      fetchBudget();
+      fetchStats();
+    }
+  }, [router.isReady, fetchBudget, fetchStats]);
 
   useEffect(() => {
     if (destinations.length > 0) {
@@ -139,6 +145,8 @@ export default function Budgets({
 
     try {
       setLoading(true);
+      const tripId = router.query.tripId as string | undefined;
+      
       if (tripBudget) {
         // Update existing
         const response = await axios.put("/api/budgets/trip", {
@@ -150,6 +158,7 @@ export default function Budgets({
       } else {
         // Create new
         const response = await axios.post("/api/budgets/trip", {
+          tripId: tripId || undefined,
           totalBudget: parseFloat(totalBudget),
           currency,
           notes,
@@ -648,9 +657,12 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   }
 
   try {
+    // Get tripId from query params if available
+    const tripId = context.query.tripId as string | undefined;
+
     const [tripBudget, allDestinations] = await Promise.all([
-      budgetApi.getTripBudget(),
-      destinationApi.getDestinations(),
+      budgetApi.getTripBudget(tripId),
+      tripId ? destinationApi.getDestinationsByTrip(tripId) : destinationApi.getDestinations(),
     ]);
 
     const serializedTripBudget = tripBudget

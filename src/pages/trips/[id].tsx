@@ -584,7 +584,7 @@ export default function TripDetails() {
               </div>
               <p className="text-xs text-gray-600">{budgetPercentage.toFixed(1)}% spent</p>
             </div>
-            <Link href={`/trips/${trip.id}/budget`}>
+            <Link href={`/budgets?tripId=${trip.id}`}>
               <button className="mt-4 w-full px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
                 View Budget
               </button>

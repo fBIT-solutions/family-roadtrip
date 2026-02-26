@@ -23,13 +23,15 @@ export default async function handler(
     // Get budget stats
     if (req.method === "GET") {
       const stats = req.query.stats;
+      const tripId = req.query.tripId as string;
+      
       if (stats) {
-        const budgetStats = await budgetApi.calculateBudgetStats();
+        const budgetStats = await budgetApi.calculateBudgetStats(tripId);
         return res.status(200).json(budgetStats);
       }
 
       // Get trip budget
-      const tripBudget = await budgetApi.getTripBudget();
+      const tripBudget = await budgetApi.getTripBudget(tripId);
       if (!tripBudget) {
         return res.status(404).json({ error: "Trip budget not found" });
       }
@@ -37,13 +39,19 @@ export default async function handler(
     }
 
     if (req.method === "POST") {
-      const { totalBudget, currency, notes } = req.body;
+      const { totalBudget, currency, notes, tripId: bodyTripId } = req.body;
+      const tripId = bodyTripId || (req.query.tripId as string);
+
+      if (!tripId) {
+        return res.status(400).json({ error: "Missing required field: tripId" });
+      }
 
       if (!totalBudget) {
         return res.status(400).json({ error: "Missing required field: totalBudget" });
       }
 
       const tripBudget = await budgetApi.createTripBudget(
+        tripId,
         parseFloat(totalBudget),
         currency || "EUR",
         notes

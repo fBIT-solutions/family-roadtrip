@@ -500,7 +500,7 @@ export default function DestinationDetail() {
                       </div>
                     )}
 
-                    <Link href={`/budgets?destinationId=${id}`}>
+                    <Link href={`/budgets?tripId=${data.destination.tripId}&destinationId=${id}`}>
                       <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                         Manage Budget
                       </button>
@@ -509,7 +509,7 @@ export default function DestinationDetail() {
                 ) : (
                   <div className="p-4 bg-gray-50 rounded-lg text-center">
                     <p className="text-gray-600 mb-4">No budget tracking started yet</p>
-                    <Link href={`/budgets?destinationId=${id}`}>
+                    <Link href={`/budgets?tripId=${data.destination.tripId}&destinationId=${id}`}>
                       <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                         Start Tracking
                       </button>
