@@ -6,12 +6,14 @@ import { authOptions } from "./api/auth/[...nextauth]";
 import type { GetServerSideProps } from "next";
 import Link from "next/link";
 import axios from "axios";
-import { Activity, Destination, FileMetadata, Trip } from "@/types/schema";
+import { Activity, Destination, FileMetadata, Trip, ItemReference } from "@/types/schema";
 import * as activitiesApi from "@/api/activities";
 import * as destinationApi from "@/api/destinations";
 import * as tripsApi from "@/api/trips";
+import { toast } from "sonner";
 import { ActivityRecommendations } from "@/components/ActivityRecommendations";
 import { QuickFileLinks } from "@/components/QuickFileLinks";
+import { Topbar } from "@/components/Topbar";
 
 const activityCategoryColors: Record<string, string> = {
   outdoor: "bg-green-100 text-green-800",
@@ -37,11 +39,13 @@ export default function Activities({
   initialDestinations = [],
   initialTrip = null,
   allTrips: initialAllTrips = [],
+  initialItemReferences = [],
 }: {
   initialActivities?: Activity[];
   initialDestinations?: Destination[];
   initialTrip?: Trip | null;
   allTrips?: Trip[];
+  initialItemReferences?: ItemReference[];
 }) {
   const router = useRouter();
   const { data: session, status } = useSession();
@@ -51,6 +55,7 @@ export default function Activities({
   const [trip, setTrip] = useState<Trip | null>(initialTrip);
   const [availableTrips, setAvailableTrips] = useState<Trip[]>(initialAllTrips);
   const [activities, setActivities] = useState<Activity[]>(initialActivities);
+  const [itemReferences, setItemReferences] = useState<ItemReference[]>(initialItemReferences);
   const [destinations, setDestinations] = useState<Destination[]>(initialDestinations);
   const [selectedDestination, setSelectedDestination] = useState<string>(
     initialDestinations?.[0]?.id || ""
@@ -66,6 +71,10 @@ export default function Activities({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [files, setFiles] = useState<FileMetadata[]>([]);
   const [activityDestination, setActivityDestination] = useState<string>(""); // For editing/creating activities
+  const [showTravelerModal, setShowTravelerModal] = useState(false);
+  const [failedTripId, setFailedTripId] = useState<string | null>(null);
+  const [failedTripName, setFailedTripName] = useState<string | null>(null);
+  const [requestingTraveler, setRequestingTraveler] = useState(false);
 
   const fetchActivities = useCallback(async () => {
     try {
@@ -79,7 +88,9 @@ export default function Activities({
         axios.get(url),
         axios.get("/api/files", { withCredentials: true }),
       ]);
-      setActivities(activitiesRes.data);
+      const { activities: fetchedActivities, itemReferences: fetchedReferences } = activitiesRes.data;
+      setActivities(fetchedActivities || activitiesRes.data);
+      setItemReferences(fetchedReferences || []);
       setFiles(filesRes.data);
     } catch (err) {
       console.error("Error fetching activities:", err);
@@ -180,9 +191,37 @@ export default function Activities({
       setActivities(
         activities.map((a) => (a.id === activity.id ? response.data : a))
       );
-    } catch (err) {
-      console.error("Error voting on activity:", err);
-      setError("Failed to vote");
+    } catch (err: any) {
+      const errorData = err?.response?.data;
+      
+      if (errorData?.reason === "GUEST_NOT_TRAVELER") {
+        setFailedTripId(errorData.tripId);
+        setFailedTripName(errorData.tripName);
+        setShowTravelerModal(true);
+        toast.info("Request access to this trip to vote on activities");
+      } else {
+        console.error("Error voting on activity:", err);
+        setError(errorData?.error || "Failed to vote");
+        toast.error(errorData?.error || "Failed to vote");
+      }
+    }
+  };
+
+  const handleRequestTraveler = async () => {
+    if (!failedTripId) return;
+    setRequestingTraveler(true);
+    try {
+      const response = await axios.post(`/api/trips/${failedTripId}/traveler-requests`);
+      toast.success("Request submitted! Waiting for trip owner approval.");
+      setShowTravelerModal(false);
+      setFailedTripId(null);
+      setFailedTripName(null);
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.error || "Failed to submit request";
+      toast.error(errorMsg);
+      console.error("Error submitting traveler request:", err);
+    } finally {
+      setRequestingTraveler(false);
     }
   };
 
@@ -225,10 +264,49 @@ export default function Activities({
     }
   };
 
+  const handleTogglePublic = async (id: string) => {
+    try {
+      const activity = activities.find(a => a.id === id);
+      if (!activity) return;
+      
+      const newPublicStatus = !activity.public;
+      await axios.patch(`/api/activities/${id}/make-public`, { isPublic: newPublicStatus });
+      
+      setActivities(activities.map(a => 
+        a.id === id ? { ...a, public: newPublicStatus } : a
+      ));
+    } catch (error) {
+      console.error("Error toggling public status:", error);
+    }
+  };
+
+  const handleAddPublicItem = async (itemRef: ItemReference) => {
+    try {
+      await axios.post("/api/item-references", {
+        type: "activity",
+        originalItemId: itemRef.originalItemId,
+      });
+      
+      // Refresh data
+      fetchActivities();
+    } catch (error) {
+      console.error("Error adding public activity:", error);
+    }
+  };
+
   // Filter activities based on selected destination, or show all if none selected
   const filteredActivities = selectedDestination
     ? activities.filter((a) => a.destinationId === selectedDestination)
     : activities;
+
+  // Combine activities with referenced activities for display
+  const allActivitiesForDisplay = [
+    ...filteredActivities,
+    ...itemReferences.filter(ref => ref.type === "activity").map(ref => ({
+      ...ref,
+      isReference: true,
+    })),
+  ];
 
   if (status === "loading") {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
@@ -249,6 +327,7 @@ export default function Activities({
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Topbar />
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
         <Link href="/">
           <button className="mb-4 px-3 sm:px-4 py-2 text-sm sm:text-base text-gray-600 hover:text-gray-900">
@@ -258,8 +337,9 @@ export default function Activities({
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">🎯 Activities</h1>
-          <Link href="/preferences" className="w-full sm:w-auto">
+          <Link href="/my-space" className="w-full sm:w-auto">
             <button className="w-full sm:w-auto px-4 py-2 text-sm sm:text-base rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition">
+              🏠 My Space
             </button>
           </Link>
         </div>
@@ -534,124 +614,194 @@ export default function Activities({
                     : "All Activities"}
                 </h2>
                 <span className="text-gray-600 text-sm">
-                  {filteredActivities.length} activity{filteredActivities.length !== 1 ? "ies" : ""}
+                  {allActivitiesForDisplay.length} activity{allActivitiesForDisplay.length !== 1 ? "ies" : ""}
                 </span>
               </div>
 
-              {filteredActivities.length === 0 ? (
+              {allActivitiesForDisplay.length === 0 ? (
                 <div className="bg-white rounded-lg shadow p-6 text-center text-gray-600">
                   <p className="mb-2">No activities added yet.</p>
                   <p className="text-sm">Add one using the form above!</p>
                 </div>
               ) : (
-                filteredActivities
-                  .sort((a, b) => b.votes - a.votes) // Sort by votes descending
-                  .map((activity) => (
-                    <div
-                      key={activity.id}
-                      className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
-                    >
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-xl font-bold text-gray-900">{activity.name}</h3>
-                            {activity.destinationId && (
-                              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                                @ {getDestinationName(activity.destinationId)}
-                              </span>
+                allActivitiesForDisplay
+                  .sort((a, b) => ('votes' in b ? b.votes : 0) - ('votes' in a ? a.votes : 0)) // Sort by votes descending
+                  .map((activity) => {
+                    const isOwnItem = 'addedBy' in activity && activity.addedBy === session?.user?.email;
+                    const isReference = 'isReference' in activity && activity.isReference;
+                    
+                    return (
+                      <div
+                        key={activity.id}
+                        className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
+                      >
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-xl font-bold text-gray-900">{activity.name}</h3>
+                              {activity.destinationId && (
+                                <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                  @ {getDestinationName(activity.destinationId)}
+                                </span>
+                              )}
+                            </div>
+                            {activity.description && (
+                              <p className="text-gray-600 mt-2">{activity.description}</p>
                             )}
                           </div>
-                          {activity.description && (
-                            <p className="text-gray-600 mt-2">{activity.description}</p>
+                          {!isReference && (
+                            <div className="text-right ml-4">
+                              <select
+                                value={'status' in activity ? activity.status : 'suggested'}
+                                onChange={(e) => handleStatusChange(activity as Activity, e.target.value)}
+                                className={`px-3 py-1 rounded text-sm font-medium ${
+                                  statusColors[('status' in activity ? activity.status : 'suggested') as keyof typeof statusColors]
+                                } border-0 focus:outline-none`}
+                              >
+                                <option value="suggested">Suggested</option>
+                                <option value="planned">Planned</option>
+                                <option value="completed">Completed</option>
+                                <option value="cancelled">Cancelled</option>
+                              </select>
+                            </div>
                           )}
                         </div>
-                        <div className="text-right ml-4">
-                          <select
-                            value={activity.status}
-                            onChange={(e) => handleStatusChange(activity, e.target.value)}
-                            className={`px-3 py-1 rounded text-sm font-medium ${
-                              statusColors[activity.status]
-                            } border-0 focus:outline-none`}
-                          >
-                            <option value="suggested">Suggested</option>
-                            <option value="planned">Planned</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        </div>
-                      </div>
 
-                      <div className="flex flex-wrap gap-2 mb-4">
-                        <span
-                          className={`inline-block px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                            activityCategoryColors[activity.category]
-                          }`}
-                        >
-                          {activity.category}
-                        </span>
-                        {activity.duration && (
-                          <span className="inline-block px-3 py-1 bg-gray-200 text-gray-800 rounded-full text-xs font-medium">
-                            ⏱️ {activity.duration}
-                          </span>
+                        <div className="flex flex-wrap gap-2 mb-4">
+                          {('category' in activity) && (
+                            <span
+                              className={`inline-block px-3 py-1 rounded-full text-xs font-medium capitalize ${
+                                activityCategoryColors[activity.category]
+                              }`}
+                            >
+                              {activity.category}
+                            </span>
+                          )}
+                          {('duration' in activity) && activity.duration && (
+                            <span className="inline-block px-3 py-1 bg-gray-200 text-gray-800 rounded-full text-xs font-medium">
+                              ⏱️ {activity.duration}
+                            </span>
+                          )}
+                          {('estimatedCost' in activity) && activity.estimatedCost && (
+                            <span className="inline-block px-3 py-1 bg-green-200 text-green-800 rounded-full text-xs font-medium">
+                              💰 {'currency' in activity ? activity.currency : 'EUR'} {(activity.estimatedCost as number).toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+
+                        {('url' in activity) && activity.url && (
+                          <div className="mb-4">
+                            <a
+                              href={activity.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-500 hover:text-blue-700 text-sm font-medium"
+                            >
+                              🔗 View on Maps/TripAdvisor →
+                            </a>
+                          </div>
                         )}
-                        {activity.estimatedCost && (
-                          <span className="inline-block px-3 py-1 bg-green-200 text-green-800 rounded-full text-xs font-medium">
-                            💰 {activity.currency} {activity.estimatedCost.toFixed(2)}
-                          </span>
+
+                        {!isReference && 'id' in activity && (
+                          <QuickFileLinks 
+                            files={files.filter(f => f.activityId === activity.id)} 
+                          />
                         )}
+
+                        <div className="border-t border-gray-200 pt-4 flex items-center justify-between flex-wrap gap-4">
+                          <div className="flex gap-4 flex-wrap">
+                            {isOwnItem && (
+                              <>
+                                <button
+                                  onClick={() => handleVote(activity as Activity)}
+                                  className={`px-4 py-2 rounded font-medium transition-colors ${
+                                    ('votedBy' in activity) && activity.votedBy.includes(session?.user?.email || "")
+                                      ? "bg-blue-500 text-white hover:bg-blue-600"
+                                      : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                                  }`}
+                                >
+                                  👍 {'votes' in activity ? activity.votes : 0} votes
+                                </button>
+                                <button
+                                  onClick={() => handleEdit(activity as Activity)}
+                                  className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 font-medium"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDelete(activity.id)}
+                                  className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 font-medium"
+                                >
+                                  Delete
+                                </button>
+                                <button
+                                  onClick={() => handleTogglePublic(activity.id)}
+                                  className={`px-4 py-2 rounded font-medium ${
+                                    ('public' in activity) && activity.public
+                                      ? "bg-green-500 text-white"
+                                      : "bg-gray-300 text-gray-700"
+                                  }`}
+                                >
+                                  {('public' in activity) && activity.public ? "🌐 Public" : "🔒 Private"}
+                                </button>
+                              </>
+                            )}
+                            
+                            {!isOwnItem && (
+                              <button
+                                onClick={() => handleAddPublicItem(activity as ItemReference)}
+                                className="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600 font-medium"
+                              >
+                                ➕ Add
+                              </button>
+                            )}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            Added by {'addedBy' in activity ? activity.addedBy : 'Referenced'}
+                          </div>
+                        </div>
                       </div>
-
-                      {activity.url && (
-                        <div className="mb-4">
-                          <a
-                            href={activity.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-500 hover:text-blue-700 text-sm font-medium"
-                          >
-                            🔗 View on Maps/TripAdvisor →
-                          </a>
-                        </div>
-                      )}
-
-                      <QuickFileLinks 
-                        files={files.filter(f => f.activityId === activity.id)} 
-                      />
-
-                      <div className="border-t border-gray-200 pt-4 flex items-center justify-between">
-                        <div className="flex gap-4">
-                          <button
-                            onClick={() => handleVote(activity)}
-                            className={`px-4 py-2 rounded font-medium transition-colors ${
-                              activity.votedBy.includes(session?.user?.email || "")
-                                ? "bg-blue-500 text-white hover:bg-blue-600"
-                                : "bg-gray-200 text-gray-700 hover:bg-gray-300"
-                            }`}
-                          >
-                            👍 {activity.votes} votes
-                          </button>
-                          <button
-                            onClick={() => handleEdit(activity)}
-                            className="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600 font-medium"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleDelete(activity.id)}
-                            className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600 font-medium"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          Added by {activity.addedBy}
-                        </div>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
               )}
             </div>
       </div>
+
+      {/* Traveler Request Modal */}
+      {showTravelerModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-bold mb-4">Request Access to Trip</h3>
+            <p className="text-gray-600 mb-2">
+              To vote on activities, you need to be a traveler on{" "}
+              <span className="font-semibold">{failedTripName}</span>.
+            </p>
+            <p className="text-gray-600 mb-6">
+              Submit a request to the trip owner and they will review it.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowTravelerModal(false);
+                  setFailedTripId(null);
+                  setFailedTripName(null);
+                }}
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 font-medium disabled:opacity-50"
+                disabled={requestingTraveler}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRequestTraveler}
+                className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 font-medium disabled:opacity-50"
+                disabled={requestingTraveler}
+              >
+                {requestingTraveler ? "Submitting..." : "Request Access"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -678,6 +828,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         initialDestinations: [],
         initialTrip: null,
         allTrips: [],
+        initialItemReferences: [],
       },
     };
   }
@@ -742,6 +893,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         initialDestinations: serializedDestinations,
         initialTrip: serializedTrip,
         allTrips: serializedTrips,
+        initialItemReferences: [],
       },
     };
   } catch (error) {
@@ -752,6 +904,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         initialDestinations: [],
         initialTrip: null,
         allTrips: [],
+        initialItemReferences: [],
       },
     };
   }

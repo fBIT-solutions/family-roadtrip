@@ -6,10 +6,11 @@ import { authOptions } from "./api/auth/[...nextauth]";
 import type { GetServerSideProps } from "next";
 import Link from "next/link";
 import axios from "axios";
-import { Destination, FileMetadata } from "@/types/schema";
+import { Destination, ItemReference, FileMetadata } from "@/types/schema";
 import { DestinationMap } from "@/components/DestinationMap";
 import { DestinationRecommendations } from "@/components/DestinationRecommendations";
 import { QuickFileLinks } from "@/components/QuickFileLinks";
+import { Topbar } from "@/components/Topbar";
 import * as destinationApi from "@/api/destinations";
 
 const statusColors: Record<string, string> = {
@@ -21,12 +22,15 @@ const statusColors: Record<string, string> = {
 
 export default function Destinations({
   initialDestinations = [],
+  initialItemReferences = [],
 }: {
   initialDestinations?: Destination[];
+  initialItemReferences?: ItemReference[];
 }) {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [destinations, setDestinations] = useState<Destination[]>(initialDestinations);
+  const [itemReferences, setItemReferences] = useState<ItemReference[]>(initialItemReferences);
   const [newName, setNewName] = useState("");
   const [newPlace, setNewPlace] = useState("");
   const [newCountry, setNewCountry] = useState("");
@@ -36,10 +40,12 @@ export default function Destinations({
   const [newLatitude, setNewLatitude] = useState("");
   const [newLongitude, setNewLongitude] = useState("");
   const [newStatus, setNewStatus] = useState<"proposed" | "accepted" | "planned" | "visited">("proposed");
+  const [newPublic, setNewPublic] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [files, setFiles] = useState<FileMetadata[]>([]);
+  const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
 
   const fetchDestinations = useCallback(async () => {
     try {
@@ -47,7 +53,9 @@ export default function Destinations({
         axios.get("/api/destinations", { withCredentials: true }),
         axios.get("/api/files", { withCredentials: true }),
       ]);
-      setDestinations(destRes.data);
+      const { destinations, itemReferences } = destRes.data;
+      setDestinations(destinations || []);
+      setItemReferences(itemReferences || []);
       setFiles(filesRes.data);
       setError(null);
       setLoading(false);
@@ -111,6 +119,7 @@ export default function Destinations({
         latitude: newLatitude ? parseFloat(newLatitude) : undefined,
         longitude: newLongitude ? parseFloat(newLongitude) : undefined,
         status: newStatus,
+        public: newPublic,
       });
       setDestinations([...destinations, response.data]);
       setNewName("");
@@ -122,6 +131,7 @@ export default function Destinations({
       setNewLatitude("");
       setNewLongitude("");
       setNewStatus("proposed");
+      setNewPublic(false);
     } catch (error) {
       console.error("Error adding destination:", error);
     }
@@ -136,12 +146,52 @@ export default function Destinations({
     }
   };
 
+  const handleTogglePublic = async (id: string) => {
+    try {
+      const destination = destinations.find(d => d.id === id);
+      if (!destination) return;
+      
+      const newPublicStatus = !destination.public;
+      await axios.patch(`/api/destinations/${id}/make-public`, { isPublic: newPublicStatus });
+      
+      setDestinations(destinations.map(d => 
+        d.id === id ? { ...d, public: newPublicStatus } : d
+      ));
+    } catch (error) {
+      console.error("Error toggling public status:", error);
+    }
+  };
+
+  const handleAddPublicItem = async (itemRef: ItemReference) => {
+    try {
+      await axios.post("/api/item-references", {
+        type: "destination",
+        originalItemId: itemRef.originalItemId,
+      });
+      
+      // Refresh data
+      fetchDestinations();
+    } catch (error) {
+      console.error("Error adding public destination:", error);
+    }
+  };
+
+  // Combine original destinations with referenced ones for display
+  const allDestinationsForDisplay = [
+    ...destinations,
+    ...itemReferences.filter(ref => ref.type === "destination").map(ref => ({
+      ...ref,
+      isReference: true,
+    })),
+  ];
+
   if (status === "loading") {
     return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Topbar />
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8">
         <Link href="/">
           <button className="mb-4 px-3 sm:px-4 py-2 text-sm sm:text-base text-gray-600 hover:text-gray-900">← Back</button>
@@ -150,9 +200,9 @@ export default function Destinations({
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-800">🌍 Destinations</h1>
           <div className="flex gap-2 w-full sm:w-auto">
-            <Link href="/preferences" className="flex-1 sm:flex-initial">
+            <Link href="/my-space" className="flex-1 sm:flex-initial">
               <button className="w-full px-3 sm:px-4 py-2 text-sm sm:text-base rounded-lg bg-purple-600 text-white hover:bg-purple-700 transition">
-                ⚙️ Preferences
+                🏠 My Space
               </button>
             </Link>
             <button
@@ -265,6 +315,30 @@ export default function Destinations({
               onChange={(e) => setNewUrls(e.target.value)}
               className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
             />
+            <div className="border-t pt-4 mt-4">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm font-semibold text-gray-700">Share This Destination Publicly</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    setNewPublic(!newPublic);
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    newPublic ? 'bg-green-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      newPublic ? 'translate-x-5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </label>
+              <p className="text-xs text-gray-500 mt-2">
+                {newPublic ? '🌐 This destination will be shared publicly and other users can discover and add it to their trips.' : '🔒 This destination will be private and only visible to you.'}
+              </p>
+            </div>
             <button
               type="submit"
               className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
@@ -306,7 +380,7 @@ export default function Destinations({
         {/* Map View */}
         {viewMode === "map" && !loading && (
           <div className="mb-8">
-            <DestinationMap destinations={destinations} />
+            <DestinationMap destinations={destinations as any} />
           </div>
         )}
 
@@ -317,75 +391,113 @@ export default function Destinations({
               <p className="text-center text-gray-600">Loading destinations...</p>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {destinations.length === 0 ? (
+                {allDestinationsForDisplay.length === 0 ? (
                   <p className="col-span-full text-center text-gray-600">No destinations yet. Be the first to suggest one!</p>
                 ) : (
-                  destinations.map((dest) => (
-                    <div
-                      key={dest.id}
-                      onClick={() => router.push(`/destinations/${dest.id}`)}
-                      className="bg-white rounded-lg shadow hover:shadow-lg transition overflow-hidden flex flex-col cursor-pointer"
-                    >
-                      {dest.mainPhotoUrl && (
-                        <img
-                          src={dest.mainPhotoUrl}
-                          alt={dest.name}
-                          className="w-full h-40 object-cover"
-                        />
-                      )}
-                      <div className="p-4 flex flex-col flex-1">
-                        <div className="flex justify-between items-start mb-2">
-                          <h3 className="text-lg font-bold text-gray-800 flex-1">{dest.name}</h3>
-                          <span className={`ml-2 px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${statusColors[dest.status]}`}>
-                            {dest.status}
-                          </span>
-                        </div>
-                        <p className="text-gray-600 text-sm">
-                          {dest.place}, {dest.country}
-                        </p>
-                        {dest.description && <p className="text-gray-500 text-sm mt-2">{dest.description}</p>}
-                        
-                        {dest.urls && dest.urls.length > 0 && (
-                          <div className="mt-3 pt-3 border-t">
-                            <p className="text-xs font-semibold text-gray-600 mb-2">Links:</p>
-                            <div className="space-y-1">
-                              {dest.urls.map((url, idx) => (
-                                <a
-                                  key={idx}
-                                  href={url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs text-blue-600 hover:underline block truncate"
-                                >
-                                  {url}
-                                </a>
-                              ))}
-                            </div>
-                          </div>
+                  allDestinationsForDisplay.map((dest) => {
+                    const isOwnItem = 'addedBy' in dest && dest.addedBy === session?.user?.email;
+                    const isReference = 'isReference' in dest && dest.isReference;
+                    
+                    return (
+                      <div
+                        key={dest.id}
+                        className="bg-white rounded-lg shadow hover:shadow-lg transition overflow-hidden flex flex-col cursor-pointer"
+                      >
+                        {dest.mainPhotoUrl && (
+                          <img
+                            src={dest.mainPhotoUrl}
+                            alt={dest.name}
+                            className="w-full h-40 object-cover"
+                          />
                         )}
+                        <div className="p-4 flex flex-col flex-1">
+                          <div className="flex justify-between items-start mb-2">
+                            <h3 className="text-lg font-bold text-gray-800 flex-1">{dest.name}</h3>
+                            <span className={`ml-2 px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${statusColors[dest.status as keyof typeof statusColors]}`}>
+                              {dest.status}
+                            </span>
+                          </div>
+                          <p className="text-gray-600 text-sm">
+                            {dest.place}, {dest.country}
+                          </p>
+                          {dest.description && <p className="text-gray-500 text-sm mt-2">{dest.description}</p>}
+                          
+                          {('urls' in dest) && dest.urls && dest.urls.length > 0 && (
+                            <div className="mt-3 pt-3 border-t">
+                              <p className="text-xs font-semibold text-gray-600 mb-2">Links:</p>
+                              <div className="space-y-1">
+                                {dest.urls.map((url, idx) => (
+                                  <a
+                                    key={idx}
+                                    href={url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-blue-600 hover:underline block truncate"
+                                  >
+                                    {url}
+                                  </a>
+                                ))}
+                              </div>
+                            </div>
+                          )}
 
-                        <QuickFileLinks 
-                          files={files.filter(f => f.destinationId === dest.id)} 
-                        />
+                          {!isReference && 'id' in dest && (
+                            <QuickFileLinks 
+                              files={files.filter(f => f.destinationId === dest.id)} 
+                            />
+                          )}
 
-                        <p className="text-xs text-gray-400 mt-3">Added by: {dest.addedBy}</p>
-                        
-                        <div className="mt-3 pt-3 border-t flex justify-between items-center">
-                          <button
-                            onClick={() => handleVote(dest.id)}
-                            className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600 flex items-center gap-1"
-                          >
-                            👍 {dest.votes}
-                          </button>
-                          <Link href={`/destinations/${dest.id}`}>
-                            <button className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
-                              Edit
-                            </button>
-                          </Link>
+                          <p className="text-xs text-gray-400 mt-3">Added by: {'addedBy' in dest ? dest.addedBy : 'Referenced'}</p>
+                          
+                          <div className="mt-3 pt-3 border-t flex justify-between items-center flex-wrap gap-2">
+                            {isOwnItem && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleTogglePublic(dest.id);
+                                }}
+                                className={`px-3 py-1 text-sm rounded ${
+                                  ('public' in dest) && dest.public
+                                    ? "bg-green-500 text-white"
+                                    : "bg-gray-300 text-gray-700"
+                                }`}
+                              >
+                                {('public' in dest) && dest.public ? "🌐 Public" : "🔒 Private"}
+                              </button>
+                            )}
+                            
+                            {!isOwnItem && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleAddPublicItem(dest as ItemReference);
+                                }}
+                                className="px-3 py-1 bg-purple-500 text-white text-sm rounded hover:bg-purple-600"
+                              >
+                                ➕ Add
+                              </button>
+                            )}
+                            
+                            {isOwnItem && (
+                              <>
+                                <button
+                                  onClick={() => handleVote(dest.id)}
+                                  className="px-3 py-1 bg-green-500 text-white text-sm rounded hover:bg-green-600 flex items-center gap-1"
+                                >
+                                  👍 {'votes' in dest ? dest.votes : 0}
+                                </button>
+                                <Link href={`/destinations/${dest.id}`}>
+                                  <button className="px-3 py-1 bg-blue-500 text-white text-sm rounded hover:bg-blue-600">
+                                    Edit
+                                  </button>
+                                </Link>
+                              </>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             )}
@@ -396,47 +508,25 @@ export default function Destinations({
   );
 }
 export const getServerSideProps: GetServerSideProps = async (context) => {
+  // Allow both authenticated and unauthenticated users
   const session = await getServerSession(context.req, context.res, authOptions);
   
-  if (!session) {
-    // Redirect to login if not authenticated
-    return {
-      redirect: {
-        destination: `/login?callbackUrl=${encodeURIComponent(context.req.url || "/destinations")}`,
-        permanent: false,
-      },
-    };
-  }
-
   // Skip data fetching if Cosmos DB env vars are not available (build time)
   if (!process.env.AZURE_COSMOS_ENDPOINT || !process.env.AZURE_COSMOS_KEY) {
     return {
       props: {
         initialDestinations: [],
+        initialItemReferences: [],
       },
     };
   }
 
-  try {
-    const initialDestinations = await destinationApi.getDestinations();
-    // Convert Date objects to ISO strings for serialization
-    const serializedDestinations = initialDestinations.map((dest) => ({
-      ...dest,
-      createdAt: dest.createdAt?.toISOString?.() || dest.createdAt,
-      updatedAt: dest.updatedAt?.toISOString?.() || dest.updatedAt,
-    }));
-    return {
-      props: {
-        initialDestinations: serializedDestinations,
-      },
-    };
-  } catch (error) {
-    console.error("Error fetching destinations in getServerSideProps:", error);
-    // Return empty list if fetch fails
-    return {
-      props: {
-        initialDestinations: [],
-      },
-    };
-  }
+  // Let the client fetch destinations via the permission-aware API endpoint
+  // This ensures proper permission checks (shows all to authenticated users, public only to anonymous)
+  return {
+    props: {
+      initialDestinations: [],
+      initialItemReferences: [],
+    },
+  };
 };

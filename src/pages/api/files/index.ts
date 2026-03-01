@@ -1,9 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../auth/[...nextauth]";
+import { authOptions } from "../auth/authConfig";
 import * as storageApi from "@/api/storage";
 import * as tripsApi from "@/api/trips";
-import { canViewTripFiles } from "@/lib/auth-helpers";
+import { canViewTripFiles, canUploadTripFiles } from "@/lib/auth-helpers";
 
 export const config = {
   api: {
@@ -25,6 +25,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.method === "POST") {
     try {
       const { filename, fileData, category, tripId, destinationId, activityId } = req.body;
+
+      // Check permission to upload files for this trip
+      if (tripId) {
+        const trip = await tripsApi.getTrip(tripId);
+        if (!trip) {
+          return res.status(404).json({ error: "Trip not found" });
+        }
+
+        if (!canUploadTripFiles(trip, userEmail)) {
+          return res.status(403).json({ error: "You do not have permission to upload files for this trip" });
+        }
+      }
 
       const blob = new Blob([Buffer.from(fileData, "base64")], {
         type: req.body.fileType,

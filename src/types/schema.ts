@@ -54,6 +54,7 @@ export const DestinationSchema = z.object({
   mainPhotoUrl: z.union([z.literal(""), z.string().url()]).optional(),
   estimatedBudget: z.number().optional(), // Estimated cost from AI recommendation
   currency: z.string().default("EUR"), // Currency for estimated budget
+  public: z.boolean().default(false), // Whether destination is visible to other users
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 });
@@ -174,6 +175,7 @@ export const ActivitySchema = z.object({
   votedBy: z.array(z.string()).default([]),
   status: z.enum(["suggested", "planned", "completed", "cancelled"]).default("suggested"),
   eventIds: z.array(z.string().uuid()).default([]), // Links to timeline events
+  public: z.boolean().default(false), // Whether activity is visible to other users
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
 });
@@ -249,6 +251,57 @@ export const UserPreferencesSchema = z.object({
   updatedAt: z.coerce.date(),
 });
 
+// ItemReference: Created when a user adds someone else's public destination or activity
+// Stores a copy of the general (non-trip-specific) data from the original item
+export const ItemReferenceSchema = z.object({
+  id: z.string().uuid(),
+  type: z.enum(["destination", "activity"]), // Type of referenced item
+  originalItemId: z.string().uuid(), // ID of the original item
+  originalCreatorId: z.string(), // User ID of original creator
+  userId: z.string(), // User who added this reference
+  tripId: z.string().uuid().optional(), // Trip this reference is associated with (optional)
+  // General data (copy from original item)
+  name: z.string(),
+  description: z.string().optional(),
+  place: z.string().optional(),
+  country: z.string().optional(),
+  latitude: z.number().optional(),
+  longitude: z.number().optional(),
+  mainPhotoUrl: z.union([z.literal(""), z.string().url()]).optional(),
+  // User-specific data for this reference
+  destinationId: z.string().uuid().optional(), // For activities: which destination they're linked to in this trip
+  status: z.string().optional(), // User's status (proposed, accepted, planned, visited, suggested, planned, completed, cancelled)
+  notes: z.string().optional(),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+});
+
+// ItemPermission: Fine-grained access control for items
+// Tracks who has what access (owner, contributor, reader) to which items
+export const ItemPermissionSchema = z.object({
+  id: z.string().uuid(),
+  itemId: z.string().uuid(), // ID of the item (trip, destination, activity, file, expense, schedule)
+  itemType: z.enum(["trip", "destination", "activity", "file", "expense", "schedule"]),
+  userId: z.string(), // Email of user, or "*" for public items
+  role: z.enum(["owner", "contributor", "reader"]),
+  parentType: z.enum(["trip", "destination"]).optional(), // Parent item type (for nested items)
+  parentId: z.string().uuid().optional(), // Parent item ID (for nested items)
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+});
+
+// Tracks requests from guests to become travelers
+export const TravelerRequestSchema = z.object({
+  id: z.string().uuid(),
+  tripId: z.string().uuid(),
+  requesterEmail: z.string().email(),
+  requesterName: z.string().optional(),
+  ownerId: z.string(), // Trip owner email
+  status: z.enum(["pending", "approved", "rejected"]).default("pending"),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+});
+
 export type User = z.infer<typeof UserSchema>;
 export type Trip = z.infer<typeof TripSchema>;
 export type Destination = z.infer<typeof DestinationSchema>;
@@ -265,3 +318,6 @@ export type DestinationRecommendation = z.infer<typeof DestinationRecommendation
 export type RecommendationCache = z.infer<typeof RecommendationCacheSchema>;
 export type RecommendationDislike = z.infer<typeof RecommendationDislikeSchema>;
 export type UserPreferences = z.infer<typeof UserPreferencesSchema>;
+export type ItemReference = z.infer<typeof ItemReferenceSchema>;
+export type ItemPermission = z.infer<typeof ItemPermissionSchema>;
+export type TravelerRequest = z.infer<typeof TravelerRequestSchema>;

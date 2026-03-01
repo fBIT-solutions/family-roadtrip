@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import axios from "axios";
+import { toast } from "sonner";
 import { Destination, Activity, FileMetadata } from "@/types/schema";
 import { FilesList } from "@/components/FilesList";
 
@@ -27,6 +28,10 @@ export default function DestinationDetail() {
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [accessDenied, setAccessDenied] = useState(false);
+  const [denialReason, setDenialReason] = useState<{ tripId?: string; tripName?: string; tripOwnerEmail?: string } | null>(null);
+  const [showTravelerModal, setShowTravelerModal] = useState(false);
+  const [requestingTraveler, setRequestingTraveler] = useState(false);
   
   // Edit form state
   const [formData, setFormData] = useState({
@@ -41,18 +46,26 @@ export default function DestinationDetail() {
     latitude: 0,
     longitude: 0,
     status: "proposed" as const,
+    public: false,
   });
   const [urlInput, setUrlInput] = useState("");
 
   useEffect(() => {
-    if (id && status === "authenticated") {
+    if (id && status !== "loading") {
+      // Fetch data for both authenticated and unauthenticated users
+      // (public destinations are viewable by anyone)
       fetchData();
-      fetchFiles();
+      // Only fetch files if authenticated
+      if (status === "authenticated") {
+        fetchFiles();
+      }
     }
   }, [id, status]);
 
   const fetchData = async () => {
     try {
+      setAccessDenied(false);
+      setDenialReason(null);
       const [destResponse, activitiesResponse] = await Promise.all([
         axios.get(`/api/destinations/${id}`),
         axios.get(`/api/activities`),
@@ -60,7 +73,7 @@ export default function DestinationDetail() {
       
       const destination = destResponse.data;
       // Filter activities by destinationId
-      const linkedActivities = activitiesResponse.data.filter(
+      const linkedActivities = (activitiesResponse.data.activities || activitiesResponse.data).filter(
         (activity: Activity) => activity.destinationId === id
       );
       
@@ -81,10 +94,24 @@ export default function DestinationDetail() {
         latitude: destination.latitude || 0,
         longitude: destination.longitude || 0,
         status: destination.status,
+        public: destination.public || false,
       });
       setUrlInput((destination.urls || []).join("\n"));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching destination:", error);
+      
+      // Handle permission denied errors
+      if (error?.response?.status === 403) {
+        setAccessDenied(true);
+        const errorData = error?.response?.data;
+        if (errorData?.tripId && errorData?.tripName) {
+          setDenialReason({
+            tripId: errorData.tripId,
+            tripName: errorData.tripName,
+            tripOwnerEmail: errorData.tripOwnerEmail,
+          });
+        }
+      }
     } finally {
       setLoading(false);
     }
@@ -124,6 +151,7 @@ export default function DestinationDetail() {
       await axios.put(`/api/destinations/${id}`, {
         ...formData,
         urls: urlList,
+        public: formData.public,
       });
       setIsEditing(false);
       await fetchData();
@@ -155,6 +183,23 @@ export default function DestinationDetail() {
     }
   };
 
+  const handleRequestTraveler = async () => {
+    if (!denialReason?.tripId) return;
+    setRequestingTraveler(true);
+    try {
+      await axios.post(`/api/trips/${denialReason.tripId}/traveler-requests`);
+      toast.success("Request submitted! Waiting for trip owner approval.");
+      setShowTravelerModal(false);
+      setAccessDenied(false);
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.error || "Failed to submit request";
+      toast.error(errorMsg);
+      console.error("Error submitting traveler request:", err);
+    } finally {
+      setRequestingTraveler(false);
+    }
+  };
+
   if (status === "unauthenticated") {
     return (
       <div className="flex items-center justify-center min-h-screen">
@@ -172,6 +217,72 @@ export default function DestinationDetail() {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <p className="text-gray-600">Loading...</p>
+      </div>
+    );
+  }
+
+  if (accessDenied) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4 text-center">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4">Access Denied</h2>
+          <p className="text-gray-600 mb-4">
+            You need traveler access to view this destination's details.
+          </p>
+          <p className="text-gray-600 mb-6">
+            {denialReason?.tripName ? (
+              <>Request access to <span className="font-semibold">{denialReason.tripName}</span> to continue.</>
+            ) : (
+              "Request access to this trip to continue."
+            )}
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => router.push("/destinations")}
+              className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 font-medium"
+            >
+              Back
+            </button>
+            <button
+              onClick={() => setShowTravelerModal(true)}
+              className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 font-medium"
+            >
+              Request Access
+            </button>
+          </div>
+        </div>
+
+        {/* Traveler Request Modal */}
+        {showTravelerModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-lg p-6 max-w-md w-full mx-4">
+              <h3 className="text-lg font-bold mb-4">Request Access to Trip</h3>
+              <p className="text-gray-600 mb-2">
+                To view this destination and its details, you need to be a traveler on{" "}
+                <span className="font-semibold">{denialReason?.tripName}</span>.
+              </p>
+              <p className="text-gray-600 mb-6">
+                Submit a request to the trip owner and they will review it.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowTravelerModal(false)}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 font-medium disabled:opacity-50"
+                  disabled={requestingTraveler}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleRequestTraveler}
+                  className="flex-1 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 font-medium disabled:opacity-50"
+                  disabled={requestingTraveler}
+                >
+                  {requestingTraveler ? "Submitting..." : "Request Access"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -394,7 +505,29 @@ export default function DestinationDetail() {
               </div>
             </div>
 
-            <div className="flex gap-3 pt-4">
+            <div className="border-t pt-4 mt-6">
+              <label className="flex items-center justify-between cursor-pointer">
+                <span className="text-sm font-semibold text-gray-700">Share This Destination Publicly</span>
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, public: !formData.public })}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    formData.public ? 'bg-green-600' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      formData.public ? 'translate-x-5' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </label>
+              <p className="text-xs text-gray-500 mt-2">
+                {formData.public ? '🌐 This destination is shared publicly and other users can discover and add it to their trips.' : '🔒 This destination is private and only visible to you.'}
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-4 mt-6">
               <button
                 onClick={handleSave}
                 disabled={saving}

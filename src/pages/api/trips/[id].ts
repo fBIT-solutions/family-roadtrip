@@ -14,6 +14,7 @@ const UpdateTripSchema = TripSchema.pick({
   totalBudget: true,
   currency: true,
   people: true,
+  viewers: true,
   hasPet: true,
   description: true,
   status: true,

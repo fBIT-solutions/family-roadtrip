@@ -4,7 +4,8 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import * as activitiesApi from "@/api/activities";
 import * as tripsApi from "@/api/trips";
 import * as destinationsApi from "@/api/destinations";
-import { canViewTripActivities } from "@/lib/auth-helpers";
+import * as itemReferencesApi from "@/api/itemReferences";
+import * as permissionsApi from "@/api/itemPermissions";
 
 type ResponseData = any;
 
@@ -28,8 +29,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
           return res.status(404).json({ error: "Trip not found" });
         }
 
-        // Check if user has access to view activities in this trip
-        if (!canViewTripActivities(trip, userEmail)) {
+        // Check if user has permission to view trip
+        const canView = await permissionsApi.canViewItem(tripId, userEmail || "");
+        if (!canView) {
           return res.status(403).json({ error: "You do not have access to this trip's activities" });
         }
 
@@ -53,9 +55,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         return res.status(200).json(activities);
       }
 
-      // If no filters, return all activities (legacy behavior)
-      const activities = await activitiesApi.getActivities();
-      return res.status(200).json(activities);
+      // If no filters, return activities visible to the user (their own + from their trips + public)
+      const userTrips = await tripsApi.getTrips(userEmail || "");
+      const userTripIds = userTrips.map((t) => t.id);
+      
+      const activities = await activitiesApi.getActivitiesForUser(userEmail || "", userTripIds);
+      const itemReferences = await itemReferencesApi.getItemReferencesByUser(userEmail || "");
+      
+      console.log(`Returning ${activities.length} activities and ${itemReferences.length} item references`);
+      return res.status(200).json({ activities, itemReferences });
     } catch (error) {
       console.error("Error fetching activities:", error);
       return res.status(500).json({ error: "Failed to fetch activities" });
@@ -70,14 +78,21 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     }
 
     try {
-      const activity = await activitiesApi.createActivity(name, destinationId, session.user?.email || "", {
-        category,
-        description,
-        url,
-        estimatedCost,
-        duration,
-        status,
-      });
+      const destination = await destinationsApi.getDestination(destinationId as string);
+      const activity = await activitiesApi.createActivity(
+        name,
+        destinationId,
+        session.user?.email || "",
+        {
+          category,
+          description,
+          url,
+          estimatedCost,
+          duration,
+          status,
+        },
+        destination?.tripId
+      );
       return res.status(201).json(activity);
     } catch (error) {
       console.error("Error creating activity:", error);
@@ -89,6 +104,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
     const { id } = req.query;
 
     try {
+      // Check ownership before deletion
+      const isOwner = await permissionsApi.isOwner(id as string, userEmail || "");
+      if (!isOwner) {
+        return res.status(403).json({ error: "Only owner can delete this activity" });
+      }
+
       await activitiesApi.deleteActivity(id as string);
       return res.status(200).json({ success: true });
     } catch (error) {

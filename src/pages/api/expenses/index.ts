@@ -3,8 +3,8 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
 import * as expenseApi from "@/api/expenses";
 import * as tripsApi from "@/api/trips";
+import * as permissionsApi from "@/api/itemPermissions";
 import { Expense } from "@/types/schema";
-import { canViewTripExpenses } from "@/lib/auth-helpers";
 
 type ResponseData = Expense | Expense[] | { error: string; details?: string } | { message: string };
 
@@ -33,8 +33,9 @@ export default async function handler(
           return res.status(404).json({ error: "Trip not found" });
         }
 
-        // Check if user has access to view expenses in this trip
-        if (!canViewTripExpenses(trip, userEmail)) {
+        // Check if user has permission to view trip
+        const canView = await permissionsApi.canViewItem(tripId, userEmail || "");
+        if (!canView) {
           return res.status(403).json({ error: "You do not have access to this trip's expenses" });
         }
 
@@ -56,19 +57,22 @@ export default async function handler(
         return res.status(400).json({ error: "Missing required fields: title, amount, paidBy" });
       }
 
-      const newExpense = await expenseApi.createExpense({
-        title,
-        amount: parseFloat(amount),
-        currency: currency || "EUR",
-        category: category || "other",
-        date: new Date(date),
-        paidBy,
-        splitWith: splitWith || [],
-        destinationId: destinationId || undefined,
-        tripId: tripId || undefined,
-        notes: notes || undefined,
-        receiptUrl: receiptUrl || undefined,
-      });
+      const newExpense = await expenseApi.createExpense(
+        {
+          title,
+          amount: parseFloat(amount),
+          currency: currency || "EUR",
+          category: category || "other",
+          date: new Date(date),
+          paidBy,
+          splitWith: splitWith || [],
+          destinationId: destinationId || undefined,
+          tripId: tripId || undefined,
+          notes: notes || undefined,
+          receiptUrl: receiptUrl || undefined,
+        },
+        userEmail || undefined
+      );
 
       return res.status(201).json(newExpense);
     }

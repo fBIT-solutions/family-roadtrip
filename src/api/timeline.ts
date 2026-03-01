@@ -1,9 +1,12 @@
 import { containers } from "@/lib/cosmosdb";
 import { TimelineEvent, TimelineEventSchema } from "@/types/schema";
 import { v4 as uuidv4 } from "uuid";
+import * as permissionsApi from "./itemPermissions";
+import * as tripsApi from "./trips";
 
 export async function createTimelineEvent(
-  data: Omit<TimelineEvent, "id" | "createdAt" | "updatedAt">
+  data: Omit<TimelineEvent, "id" | "createdAt" | "updatedAt">,
+  creatorEmail?: string
 ): Promise<TimelineEvent> {
   const event: TimelineEvent = {
     ...data,
@@ -14,6 +17,56 @@ export async function createTimelineEvent(
 
   try {
     await containers.timeline.items.create(event);
+    
+    // Grant permissions if tripId and creator email are provided
+    if (event.tripId && creatorEmail) {
+      try {
+        // Creator gets contributor permission
+        await permissionsApi.grantPermission(
+          event.id,
+          "schedule",
+          creatorEmail,
+          "contributor",
+          "trip",
+          event.tripId
+        );
+        
+        // Grant access to trip members
+        const trip = await tripsApi.getTrip(event.tripId);
+        if (trip) {
+          // All travelers can edit
+          for (const email of trip.people) {
+            if (email !== creatorEmail) {
+              await permissionsApi.grantPermission(
+                event.id,
+                "schedule",
+                email,
+                "contributor",
+                "trip",
+                event.tripId
+              );
+            }
+          }
+          
+          // Viewers can only read
+          for (const email of trip.viewers) {
+            if (email !== creatorEmail) {
+              await permissionsApi.grantPermission(
+                event.id,
+                "schedule",
+                email,
+                "reader",
+                "trip",
+                event.tripId
+              );
+            }
+          }
+        }
+      } catch (permError) {
+        console.error("Error granting timeline permissions:", permError);
+      }
+    }
+    
     return event;
   } catch (error) {
     console.error("Error creating timeline event:", error);

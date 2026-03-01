@@ -104,10 +104,10 @@ export function canEditTripActivities(trip: Trip, userEmail?: string | null): bo
 }
 
 /**
- * Check if user can view trip files/media (travelers and viewers can see)
+ * Check if user can view trip files/media (travelers only, not viewers)
  */
 export function canViewTripFiles(trip: Trip, userEmail?: string | null): boolean {
-  return canViewTrip(trip, userEmail);
+  return canEditTrip(trip, userEmail);
 }
 
 /**
@@ -142,5 +142,12 @@ export function canViewTripExpenses(trip: Trip, userEmail?: string | null): bool
  * Check if user can create expense (travelers only)
  */
 export function canCreateExpense(trip: Trip, userEmail?: string | null): boolean {
+  return canEditTrip(trip, userEmail);
+}
+
+/**
+ * Check if user can vote on destinations/activities (travelers only, not viewers)
+ */
+export function canVoteOnItems(trip: Trip, userEmail?: string | null): boolean {
   return canEditTrip(trip, userEmail);
 }

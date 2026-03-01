@@ -1,9 +1,13 @@
 import { containers } from "@/lib/cosmosdb";
 import { Destination, DestinationSchema } from "@/types/schema";
 import { v4 as uuidv4 } from "uuid";
+import * as permissionsApi from "./itemPermissions";
+import * as tripsApi from "./trips";
 
 export async function createDestination(
-  data: Omit<Destination, "id" | "createdAt" | "updatedAt" | "votes" | "votedBy">
+  data: Omit<Destination, "id" | "createdAt" | "updatedAt" | "votes" | "votedBy">,
+  creatorEmail?: string,
+  tripId?: string
 ): Promise<Destination> {
   const destination: Destination = {
     ...data,
@@ -16,6 +20,54 @@ export async function createDestination(
 
   try {
     await containers.destinations.items.create(destination);
+    
+    // Grant permissions if creator email and/or tripId are provided
+    if (creatorEmail) {
+      // Creator gets owner permission
+      await permissionsApi.grantPermission(
+        destination.id,
+        "destination",
+        creatorEmail,
+        "owner",
+        tripId ? "trip" : undefined,
+        tripId
+      );
+      
+      // If destination is linked to a trip, grant permissions to trip members
+      if (tripId) {
+        const trip = await tripsApi.getTrip(tripId);
+        if (trip) {
+          // Grant contributor access to travelers
+          for (const email of trip.people) {
+            if (email !== creatorEmail) {
+              await permissionsApi.grantPermission(
+                destination.id,
+                "destination",
+                email,
+                "contributor",
+                "trip",
+                tripId
+              );
+            }
+          }
+          
+          // Grant reader access to viewers
+          for (const email of trip.viewers) {
+            if (email !== creatorEmail) {
+              await permissionsApi.grantPermission(
+                destination.id,
+                "destination",
+                email,
+                "reader",
+                "trip",
+                tripId
+              );
+            }
+          }
+        }
+      }
+    }
+    
     return destination;
   } catch (error) {
     console.error("Error creating destination:", error);
@@ -23,13 +75,42 @@ export async function createDestination(
   }
 }
 
-export async function getDestinations(): Promise<Destination[]> {
+/**
+ * Get destinations that a user can see:
+ * 1. Destinations they created (addedBy = userId)
+ * 2. Destinations in trips they are part of (creator, traveler, or viewer)
+ * 3. Public destinations from other users
+ */
+export async function getDestinationsForUser(
+  userId: string,
+  userTripIds: string[] = []
+): Promise<Destination[]> {
   try {
+    // Get destinations user created or are in their trips
+    let query = "SELECT * FROM c WHERE c.addedBy = @userId";
+    const parameters: any[] = [{ name: "@userId", value: userId }];
+
+    // Add destinations from user's trips if any
+    if (userTripIds.length > 0) {
+      const placeholders = userTripIds.map((_, i) => `@tripId${i}`).join(",");
+      query += ` OR c.tripId IN (${placeholders})`;
+      userTripIds.forEach((tripId, i) => {
+        parameters.push({ name: `@tripId${i}`, value: tripId });
+      });
+    }
+
+    // Add public destinations (visible to everyone)
+    query += ` OR c.public = true`;
+    query += ` ORDER BY c.votes DESC`;
+
     const { resources } = await containers.destinations.items
-      .query("SELECT * FROM c ORDER BY c.votes DESC")
+      .query({
+        query,
+        parameters,
+      })
       .fetchAll();
 
-    console.log(`Fetched ${resources.length} destinations from database`);
+    console.log(`Fetched ${resources.length} destinations for user ${userId}`);
     const parsed = resources.map((r: any) => {
       try {
         return DestinationSchema.parse(r);
@@ -40,9 +121,59 @@ export async function getDestinations(): Promise<Destination[]> {
     });
     return parsed;
   } catch (error) {
-    console.error("Error fetching destinations:", error);
+    console.error("Error fetching destinations for user:", error);
     throw error;
   }
+}
+
+/**
+ * Get only public destinations (for public discovery)
+ */
+export async function getPublicDestinations(excludeCreatorEmail?: string): Promise<Destination[]> {
+  try {
+    let query = "SELECT * FROM c WHERE c.public = true ORDER BY c.votes DESC";
+    let parameters: any[] = [];
+
+    // Optionally exclude destinations created by a specific user
+    if (excludeCreatorEmail) {
+      query = "SELECT * FROM c WHERE c.public = true AND c.addedBy != @creatorEmail ORDER BY c.votes DESC";
+      parameters = [{ name: "@creatorEmail", value: excludeCreatorEmail }];
+    }
+
+    const { resources } = await containers.destinations.items
+      .query({
+        query,
+        parameters,
+      })
+      .fetchAll();
+
+    console.log(`Fetched ${resources.length} public destinations`);
+    const parsed = resources.map((r: any) => {
+      try {
+        return DestinationSchema.parse(r);
+      } catch (parseError) {
+        console.error("Error parsing destination:", r, parseError);
+        throw parseError;
+      }
+    });
+    return parsed;
+  } catch (error) {
+    console.error("Error fetching public destinations:", error);
+    throw error;
+  }
+}
+
+/**
+ * Legacy function: Get destinations for user (permission-aware)
+ * DEPRECATED: Use getDestinationsForUser() instead
+ * Now returns user-visible destinations only
+ */
+export async function getDestinations(userId?: string, userTripIds: string[] = []): Promise<Destination[]> {
+  if (!userId) {
+    console.warn("getDestinations() called without userId - returning only public destinations");
+    return getPublicDestinations();
+  }
+  return getDestinationsForUser(userId, userTripIds);
 }
 
 export async function getDestination(id: string): Promise<Destination | null> {
@@ -143,4 +274,8 @@ export async function deleteDestination(id: string): Promise<boolean> {
     console.error("Error deleting destination:", error);
     return false;
   }
+}
+
+export async function getDestinationsContainer() {
+  return containers.destinations;
 }

@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../auth/authConfig";
+import { authOptions } from "../../auth/[...nextauth]";
 import * as tripsApi from "@/api/trips";
-import { canManageTripMembers } from "@/lib/auth-helpers";
+import * as permissionsApi from "@/api/itemPermissions";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -20,57 +20,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === "POST") {
     try {
-      // Fetch the trip to check permissions
-      const trip = await tripsApi.getTrip(id);
-      if (!trip) {
-        return res.status(404).json({ error: "Trip not found" });
+      // Check if user is trip owner
+      const isOwner = await permissionsApi.isOwner(id, userEmail || "");
+      if (!isOwner) {
+        return res.status(403).json({ error: "Only the trip owner can manage members" });
       }
 
-      // Only creator can manage members
-      if (!canManageTripMembers(trip, userEmail)) {
-        return res.status(403).json({ error: "Only the trip creator can manage members" });
-      }
+      const { email, role } = req.body; // role: "contributor" | "reader"
 
-      const { email, role } = req.body; // role: "traveler" | "viewer"
-
-      if (!email || !["traveler", "viewer"].includes(role)) {
+      if (!email || !["contributor", "reader"].includes(role)) {
         return res.status(400).json({ error: "Invalid email or role" });
       }
 
-      // Check if already a member
-      if (trip.people.includes(email) || trip.viewers.includes(email)) {
-        return res.status(400).json({ error: "User is already a member of this trip" });
-      }
-
       // Add member based on role
-      const updates: any = {};
-      if (role === "traveler") {
-        updates.people = [...trip.people, email];
-      } else if (role === "viewer") {
-        updates.viewers = [...trip.viewers, email];
+      if (role === "contributor") {
+        await tripsApi.addTravelerToTrip(id, email);
+      } else {
+        await tripsApi.addViewerToTrip(id, email);
       }
 
-      const updated = await tripsApi.updateTrip(id, updates);
-      if (!updated) {
-        return res.status(500).json({ error: "Failed to add member" });
-      }
-
-      res.status(200).json(updated);
+      res.status(200).json({ success: true });
     } catch (error) {
       console.error("Error adding trip member:", error);
       res.status(500).json({ error: "Failed to add member" });
     }
   } else if (req.method === "DELETE") {
     try {
-      // Fetch the trip to check permissions
-      const trip = await tripsApi.getTrip(id);
-      if (!trip) {
-        return res.status(404).json({ error: "Trip not found" });
-      }
-
-      // Only creator can manage members
-      if (!canManageTripMembers(trip, userEmail)) {
-        return res.status(403).json({ error: "Only the trip creator can manage members" });
+      // Check if user is trip owner
+      const isOwner = await permissionsApi.isOwner(id, userEmail || "");
+      if (!isOwner) {
+        return res.status(403).json({ error: "Only the trip owner can manage members" });
       }
 
       const { email } = req.query;
@@ -79,25 +58,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: "Email is required" });
       }
 
-      // Remove from travelers or viewers
-      const updates: any = {};
-      if (trip.people.includes(email)) {
-        updates.people = trip.people.filter((e) => e !== email);
-      }
-      if (trip.viewers.includes(email)) {
-        updates.viewers = trip.viewers.filter((e) => e !== email);
-      }
-
-      if (!updates.people && !updates.viewers) {
-        return res.status(400).json({ error: "User is not a member of this trip" });
+      // Get user's role to determine removal method
+      const userRole = await permissionsApi.getUserPermissionRole(id, email);
+      
+      if (userRole === "contributor") {
+        await tripsApi.removeTravelerFromTrip(id, email);
+      } else if (userRole === "reader") {
+        await tripsApi.removeViewerFromTrip(id, email);
       }
 
-      const updated = await tripsApi.updateTrip(id, updates);
-      if (!updated) {
-        return res.status(500).json({ error: "Failed to remove member" });
-      }
-
-      res.status(200).json(updated);
+      res.status(200).json({ success: true });
     } catch (error) {
       console.error("Error removing trip member:", error);
       res.status(500).json({ error: "Failed to remove member" });

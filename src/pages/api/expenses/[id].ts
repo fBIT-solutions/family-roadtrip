@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
 import * as expenseApi from "@/api/expenses";
+import * as permissionsApi from "@/api/itemPermissions";
 import { Expense } from "@/types/schema";
 
 type ResponseData = Expense | { error: string; details?: string } | { message: string };
@@ -17,6 +18,7 @@ export default async function handler(
     return res.status(401).json({ error: "Unauthorized", details: "No valid session" });
   }
 
+  const userEmail = session.user?.email || "";
   const { id } = req.query;
 
   if (typeof id !== "string") {
@@ -25,8 +27,12 @@ export default async function handler(
 
   try {
     if (req.method === "GET") {
-      const expense = await expenseApi.getExpenseById(id);
+      const canView = await permissionsApi.canViewItem(id as string, userEmail);
+      if (!canView) {
+        return res.status(403).json({ error: "You do not have access to this expense" });
+      }
 
+      const expense = await expenseApi.getExpenseById(id);
       if (!expense) {
         return res.status(404).json({ error: "Expense not found" });
       }
@@ -35,6 +41,11 @@ export default async function handler(
     }
 
     if (req.method === "PUT") {
+      const canEdit = await permissionsApi.canEditItem(id as string, userEmail);
+      if (!canEdit) {
+        return res.status(403).json({ error: "You do not have permission to edit this expense" });
+      }
+
       const { title, amount, currency, category, date, paidBy, splitWith, destinationId, notes, receiptUrl } = req.body;
 
       const updates: Partial<Expense> = {};
@@ -54,6 +65,11 @@ export default async function handler(
     }
 
     if (req.method === "DELETE") {
+      const isOwner = await permissionsApi.isOwner(id as string, userEmail);
+      if (!isOwner) {
+        return res.status(403).json({ error: "Only owner can delete this expense" });
+      }
+
       await expenseApi.deleteExpense(id);
       return res.status(200).json({ message: "Expense deleted successfully" });
     }

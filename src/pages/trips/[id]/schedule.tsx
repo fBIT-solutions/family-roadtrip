@@ -139,7 +139,7 @@ export default function TripSchedule() {
       // Filter activities for destinations in this trip
       if (tripResponse.data.destinations && tripResponse.data.destinations.length > 0) {
         const destinationIds = new Set(tripResponse.data.destinations.map((d: any) => d.id));
-        const tripActivities = activitiesResponse.data.filter(
+        const tripActivities = (activitiesResponse.data.activities || activitiesResponse.data).filter(
           (activity: Activity) => destinationIds.has(activity.destinationId)
         );
         setActivities(tripActivities);

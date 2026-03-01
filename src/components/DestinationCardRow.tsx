@@ -21,6 +21,10 @@ export function DestinationCardRow({ destination, files, activities, onVoteChang
   const [expandedUrls, setExpandedUrls] = useState(false);
   const [destData, setDestData] = useState(destination);
   const [voting, setVoting] = useState(false);
+  const [requestingTraveler, setRequestingTraveler] = useState(false);
+  const [showTravelerModal, setShowTravelerModal] = useState(false);
+  const [failedTripId, setFailedTripId] = useState<string | null>(null);
+  const [failedTripName, setFailedTripName] = useState<string | null>(null);
   
   // Check if current user has voted
   const userHasVoted = destData.votedBy?.includes(session?.user?.email || "") || false;
@@ -32,6 +36,27 @@ export function DestinationCardRow({ destination, files, activities, onVoteChang
 
   // Filter activities for this destination
   const destinationActivities = activities.filter((a) => a.destinationId === destination.id);
+
+  const handleRequestTraveler = async () => {
+    if (!failedTripId || !session?.user?.email) {
+      toast.error("Unable to process request");
+      return;
+    }
+
+    setRequestingTraveler(true);
+    try {
+      await axios.post(`/api/trips/${failedTripId}/traveler-requests`);
+      toast.success("Request sent! The trip owner will review your request.");
+      setShowTravelerModal(false);
+      setFailedTripId(null);
+      setFailedTripName(null);
+    } catch (error: any) {
+      const errorMsg = error?.response?.data?.error || "Failed to submit request";
+      toast.error(errorMsg);
+    } finally {
+      setRequestingTraveler(false);
+    }
+  };
 
   const handleVote = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -50,9 +75,18 @@ export function DestinationCardRow({ destination, files, activities, onVoteChang
         onVoteChange(response.data);
       }
       toast.success(userHasVoted ? "Vote removed!" : "Vote added!");
-    } catch (error) {
-      console.error("Vote error:", error);
-      toast.error("Failed to update vote");
+    } catch (error: any) {
+      const errorData = error?.response?.data;
+      
+      // Check if it's a guest/traveler permission issue
+      if (errorData?.reason === "GUEST_NOT_TRAVELER") {
+        setFailedTripId(errorData.tripId);
+        setFailedTripName(errorData.tripName);
+        setShowTravelerModal(true);
+      } else {
+        console.error("Vote error:", error);
+        toast.error(errorData?.error || "Failed to update vote");
+      }
     } finally {
       setVoting(false);
     }
@@ -216,6 +250,53 @@ export function DestinationCardRow({ destination, files, activities, onVoteChang
           </div>
         </div>
       </div>
+
+      {/* Traveler Request Modal */}
+      {showTravelerModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
+            <h3 className="text-2xl font-bold text-gray-800 mb-4">Request Traveler Access</h3>
+            <div className="space-y-4">
+              <div>
+                <p className="text-gray-700 mb-3">
+                  You're currently a guest on <strong>{failedTripName}</strong>. Only trip travelers can vote on destinations.
+                </p>
+                <p className="text-gray-600 text-sm">
+                  Click the button below to request traveler access. The trip owner will review your request and can approve or deny it.
+                </p>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                <p className="text-sm text-blue-800">
+                  <strong>Note:</strong> Once approved, you'll have full access to voting, budgets, files, and other trip features.
+                </p>
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowTravelerModal(false);
+                    setFailedTripId(null);
+                    setFailedTripName(null);
+                  }}
+                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRequestTraveler}
+                  disabled={requestingTraveler}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {requestingTraveler ? "Sending..." : "Request Access"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

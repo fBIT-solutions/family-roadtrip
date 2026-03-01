@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { useRouter } from "next/router";
 import Link from "next/link";
 import axios from "axios";
-import { Trip } from "@/types/schema";
+import { Trip, Destination } from "@/types/schema";
+import { Topbar } from "@/components/Topbar";
 
 export default function Home() {
   const { data: session } = useSession();
@@ -43,12 +44,18 @@ export default function Home() {
     estimatedCost: "",
     duration: "",
   });
+  const [publicDestinations, setPublicDestinations] = useState<Destination[]>([]);
+  const [publicDestinationsLoading, setPublicDestinationsLoading] = useState(false);
+  const [showAddToTripModal, setShowAddToTripModal] = useState(false);
+  const [selectedPublicDestination, setSelectedPublicDestination] = useState<Destination | null>(null);
+  const [selectedTripForDestination, setSelectedTripForDestination] = useState<string>("");
 
   const goals = ["relaxation", "adventure", "work", "cultural", "food", "family", "other"] as const;
 
   useEffect(() => {
     if (session) {
       fetchTrips();
+      fetchPublicDestinations();
     }
   }, [session]);
 
@@ -61,6 +68,18 @@ export default function Home() {
       console.error("Error fetching trips:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchPublicDestinations = async () => {
+    setPublicDestinationsLoading(true);
+    try {
+      const response = await axios.get("/api/destinations/public");
+      setPublicDestinations(response.data.destinations || []);
+    } catch (error) {
+      console.error("Error fetching public destinations:", error);
+    } finally {
+      setPublicDestinationsLoading(false);
     }
   };
 
@@ -233,42 +252,41 @@ export default function Home() {
     }
   };
 
+  const handleAddDestinationToTrip = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedTripForDestination || !selectedPublicDestination) {
+      alert("Please select a trip");
+      return;
+    }
+
+    try {
+      await axios.post("/api/destinations", {
+        name: selectedPublicDestination.name,
+        place: selectedPublicDestination.place,
+        country: selectedPublicDestination.country,
+        description: selectedPublicDestination.description,
+        mainPhotoUrl: selectedPublicDestination.mainPhotoUrl,
+        estimatedBudget: selectedPublicDestination.estimatedBudget,
+        urls: selectedPublicDestination.urls,
+        latitude: selectedPublicDestination.latitude,
+        longitude: selectedPublicDestination.longitude,
+        tripId: selectedTripForDestination,
+        status: "proposed",
+        public: false, // When adding to a trip, mark as private
+      });
+      setShowAddToTripModal(false);
+      setSelectedPublicDestination(null);
+      setSelectedTripForDestination("");
+      alert("Destination added to trip successfully!");
+    } catch (error) {
+      console.error("Error adding destination to trip:", error);
+      alert("Failed to add destination to trip");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50">
-      <nav className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <h1 className="text-xl sm:text-2xl font-bold text-blue-600">🚗 Trip Planner</h1>
-            </div>
-            <div className="flex items-center gap-2 sm:gap-4">
-              {session ? (
-                <>
-                  <span className="text-xs sm:text-sm text-gray-700 hidden sm:block">Welcome, {session.user?.name}</span>
-                  <Link href="/preferences">
-                    <button className="px-2 sm:px-4 py-2 text-xs sm:text-sm bg-purple-600 text-white rounded hover:bg-purple-700">
-                      ⚙️ Preferences
-                    </button>
-                  </Link>
-                  <button
-                    onClick={() => signOut()}
-                    className="px-2 sm:px-4 py-2 text-xs sm:text-sm bg-red-500 text-white rounded hover:bg-red-600"
-                  >
-                    Sign Out
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => signIn()}
-                  className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Sign In
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </nav>
+      <Topbar />
 
       {session ? (
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-8 sm:py-12">
@@ -352,6 +370,63 @@ export default function Home() {
               ))}
             </div>
           )}
+
+          {/* Discover Public Destinations Section */}
+          <div className="mt-16">
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-8">Discover Public Destinations</h2>
+            {publicDestinationsLoading ? (
+              <div className="text-center text-gray-600">Loading destinations...</div>
+            ) : publicDestinations.length === 0 ? (
+              <div className="bg-white p-12 rounded-lg shadow text-center">
+                <p className="text-gray-600">No public destinations yet. Be the first to share one!</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {publicDestinations.map((destination) => (
+                  <div
+                    key={destination.id}
+                    className="bg-white rounded-lg shadow hover:shadow-lg transition overflow-hidden"
+                  >
+                    {destination.mainPhotoUrl && (
+                      <img
+                        src={destination.mainPhotoUrl}
+                        alt={destination.name}
+                        className="w-full h-40 object-cover"
+                      />
+                    )}
+                    <div className="p-4">
+                      <h3 className="text-lg font-bold text-gray-800 mb-2">{destination.name}</h3>
+                      <p className="text-sm text-gray-600 mb-2">
+                        📍 {destination.place}, {destination.country}
+                      </p>
+                      {destination.description && (
+                        <p className="text-sm text-gray-700 mb-4 line-clamp-2">{destination.description}</p>
+                      )}
+                      <div className="flex gap-2 pt-4 border-t border-gray-200">
+                        <button
+                          onClick={() => router.push(`/destinations/${destination.id}`)}
+                          className="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                        >
+                          View Details
+                        </button>
+                        {trips.length > 0 && (
+                          <button
+                            onClick={() => {
+                              setSelectedPublicDestination(destination);
+                              setShowAddToTripModal(true);
+                            }}
+                            className="flex-1 px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition"
+                          >
+                            Add to Trip
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-12 sm:py-16 text-center">
@@ -371,129 +446,132 @@ export default function Home() {
       {/* Create Trip Modal */}
       {showCreateModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full p-6">
-            <h3 className="text-2xl font-bold text-gray-800 mb-4">Create New Trip</h3>
-            <form onSubmit={handleCreateTrip} className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Trip Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g., Summer 2025 Europe"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Goal *</label>
-                <select
-                  value={formData.goal}
-                  onChange={(e) => setFormData({ ...formData, goal: e.target.value as any })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {goals.map((g) => (
-                    <option key={g} value={g}>
-                      {g.charAt(0).toUpperCase() + g.slice(1)}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full max-h-[90vh] overflow-y-auto flex flex-col">
+            <div className="p-6 flex-1 overflow-y-auto">
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">Create New Trip</h3>
+              <form onSubmit={handleCreateTrip} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Start Date *</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Trip Name *</label>
                   <input
-                    type="date"
-                    value={formData.startDate}
-                    onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    placeholder="e.g., Summer 2025 Europe"
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
+
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">End Date *</label>
-                  <input
-                    type="date"
-                    value={formData.endDate}
-                    onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Travelers</label>
-                <input
-                  type="text"
-                  value={formData.travelers}
-                  onChange={(e) => setFormData({ ...formData, travelers: e.target.value })}
-                  placeholder="Add emails separated by commas (e.g., john@example.com, jane@example.com)"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">You will be automatically added as a traveler</p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Budget *</label>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    value={formData.totalBudget}
-                    onChange={(e) => setFormData({ ...formData, totalBudget: +e.target.value })}
-                    className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Goal *</label>
                   <select
-                    value={formData.currency}
-                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                    className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    value={formData.goal}
+                    onChange={(e) => setFormData({ ...formData, goal: e.target.value as any })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    <option>EUR</option>
-                    <option>USD</option>
-                    <option>GBP</option>
-                    <option>JPY</option>
+                    {goals.map((g) => (
+                      <option key={g} value={g}>
+                        {g.charAt(0).toUpperCase() + g.slice(1)}
+                      </option>
+                    ))}
                   </select>
                 </div>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  id="hasPet"
-                  checked={formData.hasPet}
-                  onChange={(e) => setFormData({ ...formData, hasPet: e.target.checked })}
-                  className="rounded"
-                />
-                <label htmlFor="hasPet" className="text-sm font-semibold text-gray-700">
-                  Pet traveling with us 🐾
-                </label>
-              </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Start Date *</label>
+                    <input
+                      type="date"
+                      value={formData.startDate}
+                      onChange={(e) => setFormData({ ...formData, startDate: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">End Date *</label>
+                    <input
+                      type="date"
+                      value={formData.endDate}
+                      onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Add details about your trip..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Travelers</label>
+                  <input
+                    type="text"
+                    value={formData.travelers}
+                    onChange={(e) => setFormData({ ...formData, travelers: e.target.value })}
+                    placeholder="Add emails separated by commas (e.g., john@example.com, jane@example.com)"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">You will be automatically added as a traveler</p>
+                </div>
 
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  Create Trip
-                </button>
-              </div>
-            </form>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Budget *</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={formData.totalBudget}
+                      onChange={(e) => setFormData({ ...formData, totalBudget: +e.target.value })}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <select
+                      value={formData.currency}
+                      onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                      className="px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option>EUR</option>
+                      <option>USD</option>
+                      <option>GBP</option>
+                      <option>JPY</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="hasPet"
+                    checked={formData.hasPet}
+                    onChange={(e) => setFormData({ ...formData, hasPet: e.target.checked })}
+                    className="rounded"
+                  />
+                  <label htmlFor="hasPet" className="text-sm font-semibold text-gray-700">
+                    Pet traveling with us 🐾
+                  </label>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    placeholder="Add details about your trip..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"
+                  />
+                </div>
+              </form>
+            </div>
+
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                onClick={handleCreateTrip}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                Create Trip
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -501,103 +579,106 @@ export default function Home() {
       {/* Add Destination Modal */}
       {showAddDestinationModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold text-gray-800 mb-4">Add Destination</h3>
-            <form onSubmit={handleAddDestination} className="space-y-4 pb-24">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Destination Name *</label>
-                <input
-                  type="text"
-                  value={destinationFormData.name}
-                  onChange={(e) => setDestinationFormData({ ...destinationFormData, name: e.target.value })}
-                  placeholder="e.g., Paris"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto flex flex-col">
+            <div className="p-6 flex-1 overflow-y-auto">
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">Add Destination</h3>
+              <form onSubmit={handleAddDestination} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Destination Name *</label>
+                  <input
+                    type="text"
+                    value={destinationFormData.name}
+                    onChange={(e) => setDestinationFormData({ ...destinationFormData, name: e.target.value })}
+                    placeholder="e.g., Paris"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Place/Region *</label>
-                <input
-                  type="text"
-                  value={destinationFormData.place}
-                  onChange={(e) => setDestinationFormData({ ...destinationFormData, place: e.target.value })}
-                  placeholder="e.g., Île-de-France"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Place/Region *</label>
+                  <input
+                    type="text"
+                    value={destinationFormData.place}
+                    onChange={(e) => setDestinationFormData({ ...destinationFormData, place: e.target.value })}
+                    placeholder="e.g., Île-de-France"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Country *</label>
-                <input
-                  type="text"
-                  value={destinationFormData.country}
-                  onChange={(e) => setDestinationFormData({ ...destinationFormData, country: e.target.value })}
-                  placeholder="e.g., France"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Country *</label>
+                  <input
+                    type="text"
+                    value={destinationFormData.country}
+                    onChange={(e) => setDestinationFormData({ ...destinationFormData, country: e.target.value })}
+                    placeholder="e.g., France"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={destinationFormData.description}
-                  onChange={(e) => setDestinationFormData({ ...destinationFormData, description: e.target.value })}
-                  placeholder="Add details about this destination..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={destinationFormData.description}
+                    onChange={(e) => setDestinationFormData({ ...destinationFormData, description: e.target.value })}
+                    placeholder="Add details about this destination..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Main Photo URL</label>
-                <input
-                  type="url"
-                  value={destinationFormData.mainPhotoUrl}
-                  onChange={(e) => setDestinationFormData({ ...destinationFormData, mainPhotoUrl: e.target.value })}
-                  placeholder="https://example.com/photo.jpg"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Main Photo URL</label>
+                  <input
+                    type="url"
+                    value={destinationFormData.mainPhotoUrl}
+                    onChange={(e) => setDestinationFormData({ ...destinationFormData, mainPhotoUrl: e.target.value })}
+                    placeholder="https://example.com/photo.jpg"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Estimated Budget</label>
-                <input
-                  type="number"
-                  value={destinationFormData.estimatedBudget}
-                  onChange={(e) => setDestinationFormData({ ...destinationFormData, estimatedBudget: +e.target.value })}
-                  placeholder="e.g., 1000"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Estimated Budget</label>
+                  <input
+                    type="number"
+                    value={destinationFormData.estimatedBudget}
+                    onChange={(e) => setDestinationFormData({ ...destinationFormData, estimatedBudget: +e.target.value })}
+                    placeholder="e.g., 1000"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">URLs (comma separated)</label>
-                <textarea
-                  value={destinationFormData.urls.join(", ")}
-                  onChange={(e) => setDestinationFormData({ ...destinationFormData, urls: e.target.value.split(",").map(u => u.trim()).filter(u => u.length > 0) })}
-                  placeholder="https://example1.com, https://example2.com"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">URLs (comma separated)</label>
+                  <textarea
+                    value={destinationFormData.urls.join(", ")}
+                    onChange={(e) => setDestinationFormData({ ...destinationFormData, urls: e.target.value.split(",").map(u => u.trim()).filter(u => u.length > 0) })}
+                    placeholder="https://example1.com, https://example2.com"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
+                  />
+                </div>
+              </form>
+            </div>
 
-              <div className="flex gap-3 pt-4 fixed bottom-6 left-4 right-4 bg-white">
-                <button
-                  type="button"
-                  onClick={() => setShowAddDestinationModal(false)}
-                  className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-                >
-                  Add Destination
-                </button>
-              </div>
-            </form>
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowAddDestinationModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                onClick={handleAddDestination}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              >
+                Add Destination
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -605,100 +686,171 @@ export default function Home() {
       {/* Add Activity Modal */}
       {showAddActivityModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold text-gray-800 mb-4">Add Activity</h3>
-            <form onSubmit={handleAddActivity} className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Activity Name *</label>
-                <input
-                  type="text"
-                  value={activityFormData.name}
-                  onChange={(e) => setActivityFormData({ ...activityFormData, name: e.target.value })}
-                  placeholder="e.g., Visit Eiffel Tower"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Category</label>
-                <select
-                  value={activityFormData.category}
-                  onChange={(e) => setActivityFormData({ ...activityFormData, category: e.target.value as any })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  <option value="outdoor">Outdoor</option>
-                  <option value="cultural">Cultural</option>
-                  <option value="food">Food</option>
-                  <option value="nightlife">Nightlife</option>
-                  <option value="shopping">Shopping</option>
-                  <option value="sports">Sports</option>
-                  <option value="relaxation">Relaxation</option>
-                  <option value="adventure">Adventure</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={activityFormData.description}
-                  onChange={(e) => setActivityFormData({ ...activityFormData, description: e.target.value })}
-                  placeholder="Add details about the activity..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 h-20"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto flex flex-col">
+            <div className="p-6 flex-1 overflow-y-auto">
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">Add Activity</h3>
+              <form onSubmit={handleAddActivity} className="space-y-4">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Estimated Cost</label>
-                  <input
-                    type="number"
-                    value={activityFormData.estimatedCost}
-                    onChange={(e) => setActivityFormData({ ...activityFormData, estimatedCost: e.target.value })}
-                    placeholder="0"
-                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Duration</label>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Activity Name *</label>
                   <input
                     type="text"
-                    value={activityFormData.duration}
-                    onChange={(e) => setActivityFormData({ ...activityFormData, duration: e.target.value })}
-                    placeholder="e.g., 2 hours"
+                    value={activityFormData.name}
+                    onChange={(e) => setActivityFormData({ ...activityFormData, name: e.target.value })}
+                    placeholder="e.g., Visit Eiffel Tower"
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Category</label>
+                  <select
+                    value={activityFormData.category}
+                    onChange={(e) => setActivityFormData({ ...activityFormData, category: e.target.value as any })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    <option value="outdoor">Outdoor</option>
+                    <option value="cultural">Cultural</option>
+                    <option value="food">Food</option>
+                    <option value="nightlife">Nightlife</option>
+                    <option value="shopping">Shopping</option>
+                    <option value="sports">Sports</option>
+                    <option value="relaxation">Relaxation</option>
+                    <option value="adventure">Adventure</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={activityFormData.description}
+                    onChange={(e) => setActivityFormData({ ...activityFormData, description: e.target.value })}
+                    placeholder="Add details about the activity..."
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500 h-20"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Estimated Cost</label>
+                    <input
+                      type="number"
+                      value={activityFormData.estimatedCost}
+                      onChange={(e) => setActivityFormData({ ...activityFormData, estimatedCost: e.target.value })}
+                      placeholder="0"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Duration</label>
+                    <input
+                      type="text"
+                      value={activityFormData.duration}
+                      onChange={(e) => setActivityFormData({ ...activityFormData, duration: e.target.value })}
+                      placeholder="e.g., 2 hours"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">URL</label>
+                  <input
+                    type="url"
+                    value={activityFormData.url}
+                    onChange={(e) => setActivityFormData({ ...activityFormData, url: e.target.value })}
+                    placeholder="https://example.com"
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
-              </div>
+              </form>
+            </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">URL</label>
-                <input
-                  type="url"
-                  value={activityFormData.url}
-                  onChange={(e) => setActivityFormData({ ...activityFormData, url: e.target.value })}
-                  placeholder="https://example.com"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
+            <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowAddActivityModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                onClick={handleAddActivity}
+                className="flex-1 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+              >
+                Add Activity
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div className="flex gap-3 pt-4">
+      {/* Add to Trip Modal */}
+      {showAddToTripModal && selectedPublicDestination && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full max-h-[90vh] overflow-y-auto flex flex-col">
+            <div className="p-6 flex-1 overflow-y-auto">
+              <h3 className="text-2xl font-bold text-gray-800 mb-4">Add to Trip</h3>
+              <p className="text-gray-600 mb-6">
+                Select which trip you'd like to add <strong>{selectedPublicDestination.name}</strong> to:
+              </p>
+              <form onSubmit={handleAddDestinationToTrip} className="space-y-4">
+                <div>
+                  {trips.length === 0 ? (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded p-4 text-yellow-800">
+                      <p>You don't have any trips yet. Create a trip first to add destinations.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {trips.map((trip) => (
+                        <label
+                          key={trip.id}
+                          className="flex items-center p-4 border-2 border-gray-200 rounded cursor-pointer hover:border-green-500 hover:bg-green-50 transition"
+                        >
+                          <input
+                            type="radio"
+                            name="trip"
+                            value={trip.id}
+                            checked={selectedTripForDestination === trip.id}
+                            onChange={(e) => setSelectedTripForDestination(e.target.value)}
+                            className="w-4 h-4 text-green-600"
+                          />
+                          <div className="ml-4">
+                            <p className="font-semibold text-gray-800">{trip.name}</p>
+                            <p className="text-sm text-gray-600">
+                              {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </form>
+            </div>
+            {trips.length > 0 && (
+              <div className="sticky bottom-0 bg-white border-t border-gray-200 p-6 flex gap-3">
                 <button
-                  type="button"
-                  onClick={() => setShowAddActivityModal(false)}
+                  onClick={() => {
+                    setShowAddToTripModal(false);
+                    setSelectedPublicDestination(null);
+                    setSelectedTripForDestination("");
+                  }}
                   className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
                 >
                   Cancel
                 </button>
                 <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+                  onClick={handleAddDestinationToTrip}
+                  disabled={!selectedTripForDestination}
+                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                 >
-                  Add Activity
+                  Add to Trip
                 </button>
               </div>
-            </form>
+            )}
           </div>
         </div>
       )}

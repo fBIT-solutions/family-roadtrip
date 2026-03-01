@@ -1,7 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../auth/[...nextauth]";
+import { authOptions } from "../auth/authConfig";
 import * as budgetApi from "@/api/budgets";
+import * as tripsApi from "@/api/trips";
+import { canViewTripBudget } from "@/lib/auth-helpers";
 import { TripBudget } from "@/types/schema";
 
 type ResponseData = TripBudget | { error: string; details?: string } | { message: string };
@@ -19,11 +21,27 @@ export default async function handler(
 
   console.log(`Trip Budget API called by: ${session.user?.email}`);
 
+  const userEmail = session.user?.email;
+
   try {
     // Get budget stats
     if (req.method === "GET") {
       const stats = req.query.stats;
       const tripId = req.query.tripId as string;
+
+      if (!tripId) {
+        return res.status(400).json({ error: "Missing required parameter: tripId" });
+      }
+
+      // Check if user has permission to view budget
+      const trip = await tripsApi.getTrip(tripId);
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      if (!canViewTripBudget(trip, userEmail)) {
+        return res.status(403).json({ error: "You do not have permission to view this trip's budget" });
+      }
       
       if (stats) {
         const budgetStats = await budgetApi.calculateBudgetStats(tripId);
@@ -45,6 +63,16 @@ export default async function handler(
 
       if (!totalBudget) {
         return res.status(400).json({ error: "Missing required field: totalBudget" });
+      }
+
+      // Check if user has permission to edit budget
+      const trip = await tripsApi.getTrip(tripId);
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      if (!canViewTripBudget(trip, userEmail)) {
+        return res.status(403).json({ error: "You do not have permission to edit this trip's budget" });
       }
 
       const tripBudget = await budgetApi.createTripBudget(

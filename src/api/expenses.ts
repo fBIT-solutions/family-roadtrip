@@ -2,6 +2,8 @@ import { Container } from "@azure/cosmos";
 import { Expense, ExpenseSchema } from "@/types/schema";
 import { containers } from "@/lib/cosmosdb";
 import { v4 as uuidv4 } from "uuid";
+import * as permissionsApi from "./itemPermissions";
+import * as tripsApi from "./trips";
 
 export async function getExpenses(): Promise<Expense[]> {
   const { resources } = await containers.expenses.items
@@ -21,7 +23,10 @@ export async function getExpenseById(id: string): Promise<Expense | null> {
   }
 }
 
-export async function createExpense(expense: Omit<Expense, "id" | "createdAt" | "updatedAt">): Promise<Expense> {
+export async function createExpense(
+  expense: Omit<Expense, "id" | "createdAt" | "updatedAt">,
+  creatorEmail?: string
+): Promise<Expense> {
   const newExpense: Expense = {
     ...expense,
     id: uuidv4(),
@@ -31,6 +36,55 @@ export async function createExpense(expense: Omit<Expense, "id" | "createdAt" | 
   
   await containers.expenses.items.create(newExpense);
   console.log(`Created expense: ${newExpense.id}`);
+  
+  // Grant permissions if tripId and creator email are provided
+  if (newExpense.tripId && creatorEmail) {
+    try {
+      // Creator gets owner permission
+      await permissionsApi.grantPermission(
+        newExpense.id,
+        "expense",
+        creatorEmail,
+        "owner",
+        "trip",
+        newExpense.tripId
+      );
+      
+      // Grant contributor access to trip members
+      const trip = await tripsApi.getTrip(newExpense.tripId);
+      if (trip) {
+        // All travelers and viewers can see expense (contributors+ can edit)
+        for (const email of trip.people) {
+          if (email !== creatorEmail) {
+            await permissionsApi.grantPermission(
+              newExpense.id,
+              "expense",
+              email,
+              "contributor",
+              "trip",
+              newExpense.tripId
+            );
+          }
+        }
+        
+        for (const email of trip.viewers) {
+          if (email !== creatorEmail) {
+            await permissionsApi.grantPermission(
+              newExpense.id,
+              "expense",
+              email,
+              "reader",
+              "trip",
+              newExpense.tripId
+            );
+          }
+        }
+      }
+    } catch (permError) {
+      console.error("Error granting expense permissions:", permError);
+    }
+  }
+  
   return newExpense;
 }
 

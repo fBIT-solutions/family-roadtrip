@@ -33,10 +33,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     try {
       // Validate and coerce request body
       const validatedData = CreateTripSchema.parse(req.body);
-      const trip = await tripsApi.createTrip({
-        ...validatedData,
-        createdBy: session.user?.email || "",
-      });
+      const trip = await tripsApi.createTrip(
+        validatedData,
+        session.user?.email || ""
+      );
       res.status(201).json(trip);
     } catch (error) {
       console.error("Error creating trip:", error);

@@ -47,6 +47,9 @@ function initializeContainers() {
       userPreferences: null,
       recommendationDislikes: null,
       feed: null,
+      itemReferences: null,
+      itemPermissions: null,
+      travelerRequests: null,
     };
   }
 
@@ -70,6 +73,9 @@ function initializeContainers() {
     userPreferences: database.container(process.env.AZURE_COSMOS_CONTAINERS_USER_PREFERENCES || "user-preferences"),
     recommendationDislikes: database.container(process.env.AZURE_COSMOS_CONTAINERS_DISLIKES || "recommendation-dislikes"),
     feed: database.container(process.env.AZURE_COSMOS_CONTAINERS_FEED || "trip-feed"),
+    itemReferences: database.container(process.env.AZURE_COSMOS_CONTAINERS_ITEM_REFERENCES || "item-references"),
+    itemPermissions: database.container(process.env.AZURE_COSMOS_CONTAINERS_ITEM_PERMISSIONS || "item-permissions"),
+    travelerRequests: database.container(process.env.AZURE_COSMOS_CONTAINERS_TRAVELER_REQUESTS || "traveler-requests"),
   };
 
   return containersInstance;

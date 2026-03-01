@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
 import * as timelineApi from "@/api/timeline";
 import * as tripsApi from "@/api/trips";
-import { canViewTripSchedule, canEditTripSchedule } from "@/lib/auth-helpers";
+import * as permissionsApi from "@/api/itemPermissions";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -24,7 +24,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(404).json({ error: "Trip not found" });
         }
 
-        if (!canViewTripSchedule(trip, userEmail)) {
+        const canView = await permissionsApi.canViewItem(tripId, userEmail || "");
+        if (!canView) {
           return res.status(403).json({ error: "Access denied to this trip's schedule" });
         }
 
@@ -52,16 +53,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(404).json({ error: "Trip not found" });
         }
 
-        if (!canEditTripSchedule(trip, userEmail)) {
+        const canEdit = await permissionsApi.canEditItem(tripId, userEmail || "");
+        if (!canEdit) {
           return res.status(403).json({ error: "You cannot add events to this trip" });
         }
       }
 
-      const event = await timelineApi.createTimelineEvent({
-        ...req.body,
-        createdBy: userEmail,
-        tripId: tripId || req.body.tripId,
-      });
+      const event = await timelineApi.createTimelineEvent(
+        {
+          ...req.body,
+          createdBy: userEmail,
+          tripId: tripId || req.body.tripId,
+        },
+        userEmail || undefined
+      );
       res.status(201).json(event);
     } catch (error) {
       res.status(500).json({ error: "Failed to create timeline event" });

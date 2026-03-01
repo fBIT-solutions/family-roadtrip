@@ -10,6 +10,7 @@ import { MediaGallery } from "@/components/MediaGallery";
 import { DestinationCardRow } from "@/components/DestinationCardRow";
 import { ActivityRecommendations } from "@/components/ActivityRecommendations";
 import { Timeline } from "@/components/Timeline";
+import { TravelerRequestsModal } from "@/components/TravelerRequestsModal";
 
 interface TripData {
   trip: Trip;
@@ -92,12 +93,15 @@ export default function TripDetails() {
     startDate: "",
     endDate: "",
     travelers: "",
+    guests: "",
     hasPet: false,
     totalBudget: 5000,
     currency: "EUR",
     description: "",
     status: "planning" as const,
   });
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [showTravelerRequestsModal, setShowTravelerRequestsModal] = useState(false);
 
   const goals = ["relaxation", "adventure", "work", "cultural", "food", "family", "other"] as const;
   const statuses = ["planning", "active", "completed", "cancelled"] as const;
@@ -107,11 +111,22 @@ export default function TripDetails() {
   useEffect(() => {
     if (!id) return;
     fetchTripData();
+    fetchUserRole();
     fetchFeedPosts();
     fetchFiles();
     fetchExpenses();
     fetchEvents();
   }, [id]);
+
+  const fetchUserRole = async () => {
+    try {
+      const response = await axios.get(`/api/permissions/user-role?itemId=${id}&itemType=trip`);
+      setUserRole(response.data.role);
+    } catch (error) {
+      console.error("Error fetching user role:", error);
+      setUserRole(null);
+    }
+  };
 
   const fetchEvents = async () => {
     try {
@@ -137,7 +152,7 @@ export default function TripDetails() {
       ]);
       
       setTripData(tripResponse.data);
-      setActivities(activitiesResponse.data);
+      setActivities(activitiesResponse.data.activities || activitiesResponse.data);
       
       // Initialize edit form with trip data
       const trip = tripResponse.data.trip;
@@ -147,6 +162,7 @@ export default function TripDetails() {
         startDate: new Date(trip.startDate).toISOString().split("T")[0],
         endDate: new Date(trip.endDate).toISOString().split("T")[0],
         travelers: trip.people.join(", "),
+        guests: trip.viewers.join(", "),
         hasPet: trip.hasPet,
         totalBudget: trip.totalBudget,
         currency: trip.currency,
@@ -170,12 +186,18 @@ export default function TripDetails() {
         .map((t) => t.trim())
         .filter((t) => t.length > 0);
 
+      const guestsArray = editFormData.guests
+        .split(",")
+        .map((g) => g.trim())
+        .filter((g) => g.length > 0);
+
       await axios.put(`/api/trips/${id}`, {
         name: editFormData.name,
         goal: editFormData.goal,
         startDate: new Date(editFormData.startDate),
         endDate: new Date(editFormData.endDate),
         people: travelersArray,
+        viewers: guestsArray,
         hasPet: editFormData.hasPet,
         totalBudget: editFormData.totalBudget,
         currency: editFormData.currency,
@@ -470,29 +492,42 @@ export default function TripDetails() {
               <Link href="/" className="w-full sm:w-auto">
                 <button className="w-full px-3 py-2 text-sm sm:text-base bg-gray-300 rounded hover:bg-gray-400 whitespace-nowrap">← Back</button>
               </Link>
-              <button 
-                onClick={() => setShowEditModal(true)}
-                className="w-full sm:w-auto px-3 py-2 text-sm sm:text-base bg-blue-600 text-white rounded hover:bg-blue-700 whitespace-nowrap">
-                ✏️ Edit
-              </button>
+              {userRole !== "reader" && (
+                <button 
+                  onClick={() => setShowEditModal(true)}
+                  className="w-full sm:w-auto px-3 py-2 text-sm sm:text-base bg-blue-600 text-white rounded hover:bg-blue-700 whitespace-nowrap">
+                  ✏️ Edit
+                </button>
+              )}
+              {tripData?.trip.createdBy === session?.user?.email && (
+                <button 
+                  onClick={() => setShowTravelerRequestsModal(true)}
+                  className="w-full sm:w-auto px-3 py-2 text-sm sm:text-base bg-purple-600 text-white rounded hover:bg-purple-700 whitespace-nowrap">
+                  📋 Requests
+                </button>
+              )}
             </div>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:gap-2 lg:flex-wrap gap-2 mt-4">
-            <button 
-              onClick={() => setShowFileModal(true)}
-              className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-orange-600 text-white rounded hover:bg-orange-700">
-              📎 Files
-            </button>
+            {userRole !== "reader" && (
+              <button 
+                onClick={() => setShowFileModal(true)}
+                className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-orange-600 text-white rounded hover:bg-orange-700">
+                📎 Files
+              </button>
+            )}
             <button 
               onClick={() => setShowMediaModal(true)}
               className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-pink-600 text-white rounded hover:bg-pink-700">
               📸 Media
             </button>
-            <button 
-              onClick={() => setShowExpenseModal(true)}
-              className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-green-600 text-white rounded hover:bg-green-700">
-              💰 Expense
-            </button>
+            {userRole !== "reader" && (
+              <button 
+                onClick={() => setShowExpenseModal(true)}
+                className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-green-600 text-white rounded hover:bg-green-700">
+                💰 Expense
+              </button>
+            )}
             <Link href={`/trips/${trip.id}/destinations`} className="col-span-1">
               <button className="w-full px-2 py-2 text-xs sm:text-sm sm:px-4 bg-blue-600 text-white rounded hover:bg-blue-700">
                 🌍 Destinations
@@ -557,77 +592,95 @@ export default function TripDetails() {
           </div>
 
           {/* Budget */}
-          <div className="bg-white rounded-lg shadow p-6 border-t-4 border-green-500">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">💰 BUDGET</h3>
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-gray-600 mb-2">Total Budget</p>
-                <p className="text-2xl font-bold text-gray-800">{trip.currency} {stats.totalBudget.toLocaleString()}</p>
-              </div>
-              <div className="bg-gray-200 rounded-full h-3 overflow-hidden">
-                <div 
-                  className="bg-green-500 h-full transition-all"
-                  style={{ width: `${Math.min(budgetPercentage, 100)}%` }}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
+          {userRole !== "reader" ? (
+            <div className="bg-white rounded-lg shadow p-6 border-t-4 border-green-500">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">💰 BUDGET</h3>
+              <div className="space-y-4">
                 <div>
-                  <p className="text-gray-600">Spent</p>
-                  <p className="font-bold text-gray-800">{trip.currency} {stats.totalSpent.toLocaleString()}</p>
+                  <p className="text-sm text-gray-600 mb-2">Total Budget</p>
+                  <p className="text-2xl font-bold text-gray-800">{trip.currency} {stats.totalBudget.toLocaleString()}</p>
                 </div>
-                <div>
-                  <p className="text-gray-600">Remaining</p>
-                  <p className={`font-bold ${stats.remaining < 0 ? "text-red-600" : "text-green-600"}`}>
-                    {trip.currency} {stats.remaining.toLocaleString()}
-                  </p>
+                <div className="bg-gray-200 rounded-full h-3 overflow-hidden">
+                  <div 
+                    className="bg-green-500 h-full transition-all"
+                    style={{ width: `${Math.min(budgetPercentage, 100)}%` }}
+                  />
                 </div>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className="text-gray-600">Spent</p>
+                    <p className="font-bold text-gray-800">{trip.currency} {stats.totalSpent.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-600">Remaining</p>
+                    <p className={`font-bold ${stats.remaining < 0 ? "text-red-600" : "text-green-600"}`}>
+                      {trip.currency} {stats.remaining.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-600">{budgetPercentage.toFixed(1)}% spent</p>
               </div>
-              <p className="text-xs text-gray-600">{budgetPercentage.toFixed(1)}% spent</p>
+              <Link href={`/budgets?tripId=${trip.id}`}>
+                <button className="mt-4 w-full px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+                  View Budget
+                </button>
+              </Link>
             </div>
-            <Link href={`/budgets?tripId=${trip.id}`}>
-              <button className="mt-4 w-full px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
-                View Budget
-              </button>
-            </Link>
-          </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow p-6 border-t-4 border-gray-300">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">💰 BUDGET</h3>
+              <div className="flex items-center justify-center py-8">
+                <p className="text-gray-500 text-center">You don't have permission to view this content</p>
+              </div>
+            </div>
+          )}
 
           {/* Trip Feed */}
-          <div className="bg-white rounded-lg shadow p-6 border-t-4 border-purple-500">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">💬 TRIP FEED</h3>
-            <div className="bg-purple-50 rounded p-3 text-center">
-              <p className="text-gray-600 text-sm">Post messages and updates about your trip</p>
-            </div>
-            <div className="mt-4 space-y-3">
-              {feedPosts.length === 0 ? (
-                <p className="text-sm text-gray-600 italic text-center">No posts yet. Be the first to share!</p>
-              ) : (
-                feedPosts.map((post) => (
-                  <div key={post.id} className="p-3 border border-gray-200 rounded-lg hover:border-purple-400 transition">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <p className="font-semibold text-gray-800 text-sm">{post.author}</p>
-                        <p className="text-gray-700 text-sm mt-1">{post.content}</p>
-                        <p className="text-xs text-gray-500 mt-2">
-                          {new Date(post.createdAt).toLocaleDateString("en-US", {
-                            month: "short",
-                            day: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
+          {userRole !== "reader" ? (
+            <div className="bg-white rounded-lg shadow p-6 border-t-4 border-purple-500">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">💬 TRIP FEED</h3>
+              <div className="bg-purple-50 rounded p-3 text-center">
+                <p className="text-gray-600 text-sm">Post messages and updates about your trip</p>
+              </div>
+              <div className="mt-4 space-y-3">
+                {feedPosts.length === 0 ? (
+                  <p className="text-sm text-gray-600 italic text-center">No posts yet. Be the first to share!</p>
+                ) : (
+                  feedPosts.map((post) => (
+                    <div key={post.id} className="p-3 border border-gray-200 rounded-lg hover:border-purple-400 transition">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <p className="font-semibold text-gray-800 text-sm">{post.author}</p>
+                          <p className="text-gray-700 text-sm mt-1">{post.content}</p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {new Date(post.createdAt).toLocaleDateString("en-US", {
+                              month: "short",
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
+              <button
+                onClick={() => setShowFeedModal(true)}
+                className="mt-4 w-full px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
+              >
+                Post Update
+              </button>
             </div>
-            <button
-              onClick={() => setShowFeedModal(true)}
-              className="mt-4 w-full px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm"
-            >
-              Post Update
-            </button>
-          </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow p-6 border-t-4 border-gray-300">
+              <h3 className="text-xl font-bold text-gray-800 mb-4">💬 TRIP FEED</h3>
+              <div className="flex items-center justify-center py-8">
+                <p className="text-gray-500 text-center">You don't have permission to view this content</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Trip Media Section */}
@@ -775,6 +828,17 @@ export default function TripDetails() {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Guests (View-Only)</label>
+                <input
+                  type="text"
+                  value={editFormData.guests}
+                  onChange={(e) => setEditFormData({ ...editFormData, guests: e.target.value })}
+                  placeholder="Add emails separated by commas"
+                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Budget *</label>
@@ -843,7 +907,7 @@ export default function TripDetails() {
       )}
 
       {/* File Upload Modal */}
-      {showFileModal && (
+      {showFileModal && userRole !== "reader" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6">
             <h3 className="text-2xl font-bold text-gray-800 mb-4">Upload File</h3>
@@ -934,8 +998,27 @@ export default function TripDetails() {
         </div>
       )}
 
+      {showFileModal && userRole === "reader" && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6">
+            <h3 className="text-2xl font-bold text-gray-800 mb-4">📎 Files</h3>
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <p className="text-gray-600 text-lg mb-4">You don't have permission to view this content</p>
+                <button
+                  onClick={() => setShowFileModal(false)}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Expense Modal */}
-      {showExpenseModal && (
+      {showExpenseModal && userRole !== "reader" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6">
             <h3 className="text-2xl font-bold text-gray-800 mb-4">Add Expense</h3>
@@ -1109,7 +1192,7 @@ export default function TripDetails() {
       )}
 
       {/* Feed Post Modal */}
-      {showFeedModal && (
+      {showFeedModal && userRole !== "reader" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6">
             <h3 className="text-2xl font-bold text-gray-800 mb-4">Post Update to Trip Feed</h3>
@@ -1147,6 +1230,25 @@ export default function TripDetails() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showFeedModal && userRole === "reader" && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6">
+            <h3 className="text-2xl font-bold text-gray-800 mb-4">💬 Trip Feed</h3>
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center">
+                <p className="text-gray-600 text-lg mb-4">You don't have permission to view this content</p>
+                <button
+                  onClick={() => setShowFeedModal(false)}
+                  className="px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1284,6 +1386,20 @@ export default function TripDetails() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Traveler Requests Modal */}
+      {tripData && (
+        <TravelerRequestsModal
+          tripId={tripData.trip.id}
+          tripOwnerEmail={tripData.trip.createdBy}
+          isOpen={showTravelerRequestsModal}
+          onClose={() => setShowTravelerRequestsModal(false)}
+          onApprove={() => {
+            // Refresh trip data to update people array
+            fetchTripData();
+          }}
+        />
       )}
     </div>
   );
