@@ -7,19 +7,11 @@ import type { GetServerSideProps } from "next";
 import Link from "next/link";
 import axios from "axios";
 import { TripBudget, Destination } from "@/types/schema";
+import { BUDGET_ITEM_CATEGORY_COLORS, getBudgetItemCategoryColor } from "@/lib/constants";
 import { canViewTripBudget } from "@/lib/auth-helpers";
 import * as budgetApi from "@/api/budgets";
 import * as destinationApi from "@/api/destinations";
 import * as tripsApi from "@/api/trips";
-
-const categoryColors: Record<string, string> = {
-  accommodation: "bg-blue-100 text-blue-800",
-  food: "bg-orange-100 text-orange-800",
-  transport: "bg-purple-100 text-purple-800",
-  activity: "bg-green-100 text-green-800",
-  shopping: "bg-pink-100 text-pink-800",
-  other: "bg-gray-100 text-gray-800",
-};
 
 export default function Budgets({
   initialTripBudget = null,
@@ -120,12 +112,15 @@ export default function Budgets({
 
   const fetchDestinationActuals = useCallback(
     async (destIds: string[]) => {
+      if (!router.query.tripId) return;
+      
       const actuals: typeof destinationActuals = {};
       try {
         for (const destId of destIds) {
-          const response = await axios.get(`/api/budgets/destination/${destId}/actuals`, {
-            withCredentials: true,
-          });
+          const response = await axios.get(
+            `/api/budgets/destination/${destId}/actuals?tripId=${router.query.tripId}`,
+            { withCredentials: true }
+          );
           if (response.data) {
             actuals[destId] = {
               expenseLines: response.data.expenseLines || {},
@@ -139,7 +134,7 @@ export default function Budgets({
         console.error("Error fetching destination actuals:", err);
       }
     },
-    []
+    [router.query.tripId]
   );
 
   useEffect(() => {
@@ -169,20 +164,28 @@ export default function Budgets({
       
       if (tripBudget) {
         // Update existing
-        const response = await axios.put("/api/budgets/trip", {
-          totalBudget: parseFloat(totalBudget),
-          currency,
-          notes,
-        });
+        const response = await axios.put(
+          `/api/budgets/trip?tripId=${tripId}`,
+          {
+            totalBudget: parseFloat(totalBudget),
+            currency,
+            notes,
+          },
+          { withCredentials: true }
+        );
         setTripBudget(response.data);
       } else {
         // Create new
-        const response = await axios.post("/api/budgets/trip", {
-          tripId: tripId || undefined,
-          totalBudget: parseFloat(totalBudget),
-          currency,
-          notes,
-        });
+        const response = await axios.post(
+          `/api/budgets/trip?tripId=${tripId}`,
+          {
+            tripId: tripId || undefined,
+            totalBudget: parseFloat(totalBudget),
+            currency,
+            notes,
+          },
+          { withCredentials: true }
+        );
         setTripBudget(response.data);
       }
       setError(null);
@@ -196,11 +199,11 @@ export default function Budgets({
   };
 
   const handleAddDestinationBudget = async (destinationId: string) => {
-    if (!destBudgetAmount || !tripBudget) return;
+    if (!destBudgetAmount || !tripBudget || !router.query.tripId) return;
 
     try {
       const response = await axios.post(
-        `/api/budgets/destination/${destinationId}?action=add-budget`,
+        `/api/budgets/destination/${destinationId}?action=add-budget&tripId=${router.query.tripId}`,
         { totalBudget: parseFloat(destBudgetAmount) },
         { withCredentials: true }
       );
@@ -215,11 +218,11 @@ export default function Budgets({
   };
 
   const handleAddBudgetLine = async (destinationId: string) => {
-    if (!newLineBudget) return;
+    if (!newLineBudget || !router.query.tripId) return;
 
     try {
       const response = await axios.post(
-        `/api/budgets/destination/${destinationId}?action=add-line`,
+        `/api/budgets/destination/${destinationId}?action=add-line&tripId=${router.query.tripId}`,
         {
           category: newLineCategory,
           budgetAmount: parseFloat(newLineBudget),
@@ -240,11 +243,11 @@ export default function Budgets({
   };
 
   const handleDeleteBudgetLine = async (destinationId: string, lineId: string) => {
-    if (!confirm("Delete this budget line?")) return;
+    if (!confirm("Delete this budget line?") || !router.query.tripId) return;
 
     try {
       const response = await axios.delete(
-        `/api/budgets/destination/${destinationId}?action=delete-line&lineId=${lineId}`,
+        `/api/budgets/destination/${destinationId}?action=delete-line&lineId=${lineId}&tripId=${router.query.tripId}`,
         { withCredentials: true }
       );
       setTripBudget(response.data);
@@ -436,7 +439,7 @@ export default function Budgets({
                                 <div className="flex-1">
                                   <span
                                     className={`inline-block px-2 py-1 rounded text-xs font-medium capitalize mr-2 ${
-                                      categoryColors[line.category]
+                                      getBudgetItemCategoryColor(line.category as any)
                                     }`}
                                   >
                                     {line.category}
@@ -478,7 +481,7 @@ export default function Budgets({
                                 >
                                   <span
                                     className={`inline-block px-2 py-1 rounded text-xs font-medium capitalize ${
-                                      categoryColors[category]
+                                      getBudgetItemCategoryColor(category as any)
                                     }`}
                                   >
                                     {category}
@@ -506,7 +509,7 @@ export default function Budgets({
                                 >
                                   <span
                                     className={`inline-block px-2 py-1 rounded text-xs font-medium capitalize ${
-                                      categoryColors[category]
+                                      getBudgetItemCategoryColor(category as any)
                                     }`}
                                   >
                                     {category}

@@ -1,7 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "../../auth/[...nextauth]";
+import { authOptions } from "../../auth/authConfig";
 import * as budgetApi from "@/api/budgets";
+import * as tripsApi from "@/api/trips";
+import { canViewTripBudget } from "@/lib/auth-helpers";
 import { TripBudget } from "@/types/schema";
 
 type ResponseData = TripBudget | { error: string; details?: string } | { message: string };
@@ -17,13 +19,28 @@ export default async function handler(
     return res.status(401).json({ error: "Unauthorized", details: "No valid session" });
   }
 
-  const { id: destinationId, action } = req.query;
+  const userEmail = session.user?.email || "";
+  const { id: destinationId, action, tripId } = req.query;
 
   if (typeof destinationId !== "string") {
     return res.status(400).json({ error: "Invalid destination ID" });
   }
 
+  if (typeof tripId !== "string") {
+    return res.status(400).json({ error: "Missing required parameter: tripId" });
+  }
+
   try {
+    // Verify user has permission to edit this trip's budget
+    const trip = await tripsApi.getTrip(tripId);
+    if (!trip) {
+      return res.status(404).json({ error: "Trip not found" });
+    }
+
+    if (!canViewTripBudget(trip, userEmail)) {
+      return res.status(403).json({ error: "You do not have permission to edit this trip's budget" });
+    }
+
     // Add or update destination budget
     if (req.method === "POST" && action === "add-budget") {
       const { totalBudget } = req.body;
@@ -33,6 +50,7 @@ export default async function handler(
       }
 
       const tripBudget = await budgetApi.addDestinationBudget(
+        tripId,
         destinationId,
         parseFloat(totalBudget)
       );
@@ -48,6 +66,7 @@ export default async function handler(
       }
 
       const tripBudget = await budgetApi.updateDestinationBudget(
+        tripId,
         destinationId,
         parseFloat(totalBudget)
       );
@@ -63,6 +82,7 @@ export default async function handler(
       }
 
       const tripBudget = await budgetApi.addBudgetLine(
+        tripId,
         destinationId,
         category,
         parseFloat(budgetAmount),
@@ -80,6 +100,7 @@ export default async function handler(
       }
 
       const tripBudget = await budgetApi.updateBudgetLineActual(
+        tripId,
         destinationId,
         lineId,
         parseFloat(actualAmount)
@@ -95,7 +116,7 @@ export default async function handler(
         return res.status(400).json({ error: "Invalid line ID" });
       }
 
-      const tripBudget = await budgetApi.deleteBudgetLine(destinationId, lineId);
+      const tripBudget = await budgetApi.deleteBudgetLine(tripId, destinationId, lineId);
       return res.status(200).json(tripBudget);
     }
 

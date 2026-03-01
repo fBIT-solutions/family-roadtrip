@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { Destination } from "@/types/schema";
 
-// Dynamically import Leaflet components to avoid SSR issues
+// CRITICAL: Must use dynamic import with ssr: false because Leaflet uses window object
 const MapComponent = dynamic(() => import("./MapComponent"), {
   ssr: false,
   loading: () => (
@@ -17,6 +17,7 @@ interface DestinationMapProps {
   onDestinationClick?: (destination: Destination) => void;
 }
 
+// Wrapper to prevent re-renders that cause map remounts
 export const DestinationMap: React.FC<DestinationMapProps> = (props) => {
   return <MapComponent {...props} />;
 };

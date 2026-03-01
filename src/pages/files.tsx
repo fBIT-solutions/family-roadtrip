@@ -8,7 +8,7 @@ export default function Files() {
   const { data: session, status } = useSession();
   const [files, setFiles] = useState<FileMetadata[]>([]);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [category, setCategory] = useState<"picture" | "video" | "document" | "ticket" | "other">(
+  const [category, setCategory] = useState<"picture" | "video" | "document" | "ticket" | "reservation" | "other">(
     "picture"
   );
   const [loading, setLoading] = useState(true);
@@ -107,6 +107,7 @@ export default function Files() {
                 <option value="video">Video</option>
                 <option value="document">Document</option>
                 <option value="ticket">Ticket</option>
+                <option value="reservation">Reservation</option>
                 <option value="other">Other</option>
               </select>
             </div>

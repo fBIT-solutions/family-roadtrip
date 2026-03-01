@@ -49,8 +49,8 @@ export async function createTripBudget(tripId: string, totalBudget: number, curr
   return tripBudget;
 }
 
-export async function updateTripBudget(updates: Partial<TripBudget>): Promise<TripBudget> {
-  const existing = await getTripBudget();
+export async function updateTripBudget(tripId: string, updates: Partial<TripBudget>): Promise<TripBudget> {
+  const existing = await getTripBudget(tripId);
   
   if (!existing) {
     throw new Error("Trip budget not found");
@@ -60,6 +60,7 @@ export async function updateTripBudget(updates: Partial<TripBudget>): Promise<Tr
     ...existing,
     ...updates,
     id: existing.id,
+    tripId: existing.tripId,
     createdAt: existing.createdAt,
     updatedAt: new Date(),
   };
@@ -70,10 +71,11 @@ export async function updateTripBudget(updates: Partial<TripBudget>): Promise<Tr
 }
 
 export async function addDestinationBudget(
+  tripId: string,
   destinationId: string,
   totalBudget: number
 ): Promise<TripBudget> {
-  const tripBudget = await getTripBudget();
+  const tripBudget = await getTripBudget(tripId);
   
   if (!tripBudget) {
     throw new Error("Trip budget not found. Create one first.");
@@ -88,7 +90,7 @@ export async function addDestinationBudget(
     updatedAt: new Date(),
   };
 
-  const updated = await updateTripBudget({
+  const updated = await updateTripBudget(tripId, {
     destinationBudgets: [...tripBudget.destinationBudgets, destinationBudget],
   });
 
@@ -97,16 +99,17 @@ export async function addDestinationBudget(
 }
 
 export async function updateDestinationBudget(
+  tripId: string,
   destinationId: string,
   totalBudget: number
 ): Promise<TripBudget> {
-  const tripBudget = await getTripBudget();
+  const tripBudget = await getTripBudget(tripId);
   
   if (!tripBudget) {
     throw new Error("Trip budget not found");
   }
 
-  const updated = await updateTripBudget({
+  const updated = await updateTripBudget(tripId, {
     destinationBudgets: tripBudget.destinationBudgets.map((db) =>
       db.destinationId === destinationId
         ? { ...db, totalBudget, updatedAt: new Date() }
@@ -118,6 +121,7 @@ export async function updateDestinationBudget(
 }
 
 export async function getDestinationBudgetWithActuals(
+  tripId: string,
   destinationId: string
 ): Promise<{
   budget: DestinationBudget | null;
@@ -126,7 +130,7 @@ export async function getDestinationBudgetWithActuals(
   activityLines: Record<string, number>; // category -> total estimated cost
   totalActualSpent: number;
 } | null> {
-  const budget = await getDestinationBudget(destinationId);
+  const budget = await getDestinationBudget(tripId, destinationId);
   
   if (!budget) return null;
 
@@ -174,8 +178,8 @@ export async function getDestinationBudgetWithActuals(
   };
 }
 
-export async function getDestinationBudget(destinationId: string): Promise<DestinationBudget | null> {
-  const tripBudget = await getTripBudget();
+export async function getDestinationBudget(tripId: string, destinationId: string): Promise<DestinationBudget | null> {
+  const tripBudget = await getTripBudget(tripId);
   
   if (!tripBudget) return null;
   
@@ -185,12 +189,13 @@ export async function getDestinationBudget(destinationId: string): Promise<Desti
 }
 
 export async function addBudgetLine(
+  tripId: string,
   destinationId: string,
   category: string,
   budgetAmount: number,
   notes?: string
 ): Promise<TripBudget> {
-  const tripBudget = await getTripBudget();
+  const tripBudget = await getTripBudget(tripId);
   
   if (!tripBudget) {
     throw new Error("Trip budget not found");
@@ -204,7 +209,7 @@ export async function addBudgetLine(
     notes,
   };
 
-  const updated = await updateTripBudget({
+  const updated = await updateTripBudget(tripId, {
     destinationBudgets: tripBudget.destinationBudgets.map((db) =>
       db.destinationId === destinationId
         ? { ...db, lines: [...db.lines, budgetLine], updatedAt: new Date() }
@@ -217,17 +222,18 @@ export async function addBudgetLine(
 }
 
 export async function updateBudgetLineActual(
+  tripId: string,
   destinationId: string,
   lineId: string,
   actualAmount: number
 ): Promise<TripBudget> {
-  const tripBudget = await getTripBudget();
+  const tripBudget = await getTripBudget(tripId);
   
   if (!tripBudget) {
     throw new Error("Trip budget not found");
   }
 
-  const updated = await updateTripBudget({
+  const updated = await updateTripBudget(tripId, {
     destinationBudgets: tripBudget.destinationBudgets.map((db) =>
       db.destinationId === destinationId
         ? {
@@ -245,16 +251,17 @@ export async function updateBudgetLineActual(
 }
 
 export async function deleteBudgetLine(
+  tripId: string,
   destinationId: string,
   lineId: string
 ): Promise<TripBudget> {
-  const tripBudget = await getTripBudget();
+  const tripBudget = await getTripBudget(tripId);
   
   if (!tripBudget) {
     throw new Error("Trip budget not found");
   }
 
-  const updated = await updateTripBudget({
+  const updated = await updateTripBudget(tripId, {
     destinationBudgets: tripBudget.destinationBudgets.map((db) =>
       db.destinationId === destinationId
         ? {

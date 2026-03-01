@@ -105,7 +105,7 @@ export const FileMetadataSchema = z.object({
   blobUrl: z.string(),
   fileType: z.string(),
   fileSize: z.number(),
-  category: z.enum(["document", "ticket", "picture", "video", "other"]),
+  category: z.enum(["document", "ticket", "picture", "video", "reservation", "other"]),
   tripId: z.string().uuid().optional(), // Link to trip
   destinationId: z.string().uuid().optional(), // Link to destination
   activityId: z.string().uuid().optional(), // Link to activity

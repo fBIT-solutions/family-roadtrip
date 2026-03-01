@@ -7,6 +7,7 @@ import type { GetServerSideProps } from "next";
 import Link from "next/link";
 import axios from "axios";
 import { Activity, Destination, FileMetadata, Trip, ItemReference } from "@/types/schema";
+import { ACTIVITY_CATEGORY_COLORS, ACTIVITY_STATUS_COLORS, getActivityCategoryColor, getActivityStatusColor } from "@/lib/constants";
 import { canViewTrip } from "@/lib/auth-helpers";
 import * as activitiesApi from "@/api/activities";
 import * as destinationApi from "@/api/destinations";
@@ -16,25 +17,6 @@ import { toast } from "sonner";
 import { ActivityRecommendations } from "@/components/ActivityRecommendations";
 import { QuickFileLinks } from "@/components/QuickFileLinks";
 import { Topbar } from "@/components/Topbar";
-
-const activityCategoryColors: Record<string, string> = {
-  outdoor: "bg-green-100 text-green-800",
-  cultural: "bg-purple-100 text-purple-800",
-  food: "bg-orange-100 text-orange-800",
-  nightlife: "bg-pink-100 text-pink-800",
-  shopping: "bg-blue-100 text-blue-800",
-  sports: "bg-red-100 text-red-800",
-  relaxation: "bg-sky-100 text-sky-800",
-  adventure: "bg-yellow-100 text-yellow-800",
-  other: "bg-gray-100 text-gray-800",
-};
-
-const statusColors: Record<string, string> = {
-  suggested: "bg-gray-200 text-gray-800",
-  planned: "bg-blue-200 text-blue-800",
-  completed: "bg-green-200 text-green-800",
-  cancelled: "bg-red-200 text-red-800",
-};
 
 export default function Activities({
   initialActivities = [],
@@ -700,7 +682,7 @@ export default function Activities({
                                 value={'status' in activity ? activity.status : 'suggested'}
                                 onChange={(e) => handleStatusChange(activity as Activity, e.target.value)}
                                 className={`px-3 py-1 rounded text-sm font-medium ${
-                                  statusColors[('status' in activity ? activity.status : 'suggested') as keyof typeof statusColors]
+                                  getActivityStatusColor(('status' in activity ? activity.status : 'suggested') as any)
                                 } border-0 focus:outline-none`}
                               >
                                 <option value="suggested">Suggested</option>
@@ -716,7 +698,7 @@ export default function Activities({
                           {('category' in activity) && (
                             <span
                               className={`inline-block px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                                activityCategoryColors[activity.category]
+                                getActivityCategoryColor(activity.category as any)
                               }`}
                             >
                               {activity.category}

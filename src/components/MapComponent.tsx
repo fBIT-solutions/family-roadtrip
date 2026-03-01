@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import React, { useEffect, useRef } from "react";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { Destination } from "@/types/schema";
@@ -31,26 +30,104 @@ interface MapComponentProps {
   onDestinationClick?: (destination: Destination) => void;
 }
 
+// Use Leaflet directly - bypasses react-leaflet's MapContainer which has React strict mode issues
 const MapComponent: React.FC<MapComponentProps> = ({
   destinations,
   onDestinationClick,
 }) => {
-  const [isMounted, setIsMounted] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const markersRef = useRef<L.Marker[]>([]);
 
   useEffect(() => {
-    setIsMounted(true);
-  }, []);
+    if (!containerRef.current) return;
+
+    // Filter destinations with coordinates
+    const validDestinations = destinations.filter((d) => d.latitude && d.longitude);
+
+    if (validDestinations.length === 0) {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+      }
+      return;
+    }
+
+    // Calculate center
+    const center: [number, number] = [
+      validDestinations.reduce((sum, d) => sum + d.latitude!, 0) / validDestinations.length,
+      validDestinations.reduce((sum, d) => sum + d.longitude!, 0) / validDestinations.length,
+    ];
+
+    // Check if map already exists - if so, just update markers
+    if (mapRef.current) {
+      // Clear previous markers
+      markersRef.current.forEach((marker) => mapRef.current?.removeLayer(marker));
+      markersRef.current = [];
+
+      // Add new markers
+      validDestinations.forEach((dest) => {
+        const marker = L.marker([dest.latitude!, dest.longitude!], {
+          icon: createMarkerIcon(dest.status),
+        }).bindPopup(
+          `<div class="min-w-[200px]">
+            ${dest.mainPhotoUrl ? `<img src="${dest.mainPhotoUrl}" alt="${dest.name}" class="w-full h-24 object-cover rounded mb-2" />` : ''}
+            <h3 class="font-bold text-sm">${dest.name}</h3>
+            <p class="text-xs text-gray-600">${dest.place}, ${dest.country}</p>
+            <p class="text-xs mt-1"><span class="inline-block px-2 py-1 rounded text-white text-xs font-semibold" style="background-color: ${statusColors[dest.status]}">${dest.status}</span></p>
+          </div>`
+        );
+        marker.on('click', () => onDestinationClick?.(dest));
+        marker.addTo(mapRef.current!);
+        markersRef.current.push(marker);
+      });
+
+      // Fit bounds
+      const bounds = L.latLngBounds(validDestinations.map((d) => [d.latitude!, d.longitude!]));
+      mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+      return;
+    }
+
+    // Create new map instance only once
+    mapRef.current = L.map(containerRef.current).setView(center, 4);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(mapRef.current);
+
+    // Add markers
+    validDestinations.forEach((dest) => {
+      const marker = L.marker([dest.latitude!, dest.longitude!], {
+        icon: createMarkerIcon(dest.status),
+      }).bindPopup(
+        `<div class="min-w-[200px]">
+          ${dest.mainPhotoUrl ? `<img src="${dest.mainPhotoUrl}" alt="${dest.name}" class="w-full h-24 object-cover rounded mb-2" />` : ''}
+          <h3 class="font-bold text-sm">${dest.name}</h3>
+          <p class="text-xs text-gray-600">${dest.place}, ${dest.country}</p>
+          <p class="text-xs mt-1"><span class="inline-block px-2 py-1 rounded text-white text-xs font-semibold" style="background-color: ${statusColors[dest.status]}">${dest.status}</span></p>
+        </div>`
+      );
+      marker.on('click', () => onDestinationClick?.(dest));
+      marker.addTo(mapRef.current!);
+      markersRef.current.push(marker);
+    });
+
+    // Fit bounds
+    const bounds = L.latLngBounds(validDestinations.map((d) => [d.latitude!, d.longitude!]));
+    mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+
+    // Cleanup on unmount
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove();
+        mapRef.current = null;
+        markersRef.current = [];
+      }
+    };
+  }, [destinations, onDestinationClick]);
 
   // Filter destinations with coordinates
   const validDestinations = destinations.filter((d) => d.latitude && d.longitude);
-
-  if (!isMounted) {
-    return (
-      <div className="w-full h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-        <p className="text-gray-600">Loading map...</p>
-      </div>
-    );
-  }
 
   if (validDestinations.length === 0) {
     return (
@@ -60,69 +137,7 @@ const MapComponent: React.FC<MapComponentProps> = ({
     );
   }
 
-  // Calculate bounds
-  const bounds = validDestinations.reduce(
-    (acc, dest) => {
-      if (!dest.latitude || !dest.longitude) return acc;
-      return {
-        minLat: Math.min(acc.minLat, dest.latitude),
-        maxLat: Math.max(acc.maxLat, dest.latitude),
-        minLng: Math.min(acc.minLng, dest.longitude),
-        maxLng: Math.max(acc.maxLng, dest.longitude),
-      };
-    },
-    { minLat: 90, maxLat: -90, minLng: 180, maxLng: -180 }
-  );
-
-  const center: [number, number] = [
-    (bounds.minLat + bounds.maxLat) / 2,
-    (bounds.minLng + bounds.maxLng) / 2,
-  ];
-
-  return (
-    <div className="w-full h-96 rounded-lg overflow-hidden">
-      <MapContainer center={center} zoom={4} style={{ height: "100%", width: "100%" }}>
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        {validDestinations.map((dest) => (
-          <Marker
-            key={dest.id}
-            position={[dest.latitude!, dest.longitude!]}
-            icon={createMarkerIcon(dest.status)}
-            eventHandlers={{
-              click: () => onDestinationClick?.(dest),
-            }}
-          >
-            <Popup>
-              <div className="min-w-[200px]">
-                {dest.mainPhotoUrl && (
-                  <img
-                    src={dest.mainPhotoUrl}
-                    alt={dest.name}
-                    className="w-full h-24 object-cover rounded mb-2"
-                  />
-                )}
-                <h3 className="font-bold text-sm">{dest.name}</h3>
-                <p className="text-xs text-gray-600">
-                  {dest.place}, {dest.country}
-                </p>
-                <p className="text-xs mt-1">
-                  <span
-                    className="inline-block px-2 py-1 rounded text-white text-xs font-semibold"
-                    style={{ backgroundColor: statusColors[dest.status] }}
-                  >
-                    {dest.status}
-                  </span>
-                </p>
-              </div>
-            </Popup>
-          </Marker>
-        ))}
-      </MapContainer>
-    </div>
-  );
+  return <div ref={containerRef} className="w-full h-96 rounded-lg overflow-hidden" />;
 };
 
 export default MapComponent;

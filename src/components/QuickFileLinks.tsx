@@ -9,7 +9,7 @@ interface QuickFileLinksProps {
 export function QuickFileLinks({ files, maxDisplay = 3 }: QuickFileLinksProps) {
   // Filter for tickets and reservations only
   const ticketFiles = files.filter(
-    (file) => file.category === "ticket" || file.category === "other"
+    (file) => file.category === "ticket" || file.category === "reservation" || file.category === "other"
   );
 
   if (ticketFiles.length === 0) {

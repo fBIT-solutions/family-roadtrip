@@ -25,10 +25,14 @@ export function FilesList({ files, onDelete, isLoading }: FilesListProps) {
     switch (category) {
       case "ticket":
         return "🎫";
+      case "reservation":
+        return "🏨";
       case "document":
         return "📄";
       case "picture":
         return "🖼️";
+      case "video":
+        return "🎥";
       case "other":
         return "📎";
       default:

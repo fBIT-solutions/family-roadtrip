@@ -6,17 +6,9 @@ import type { GetServerSideProps } from "next";
 import Link from "next/link";
 import axios from "axios";
 import { Expense, Destination } from "@/types/schema";
+import { EXPENSE_CATEGORY_COLORS, getExpenseCategoryColor } from "@/lib/constants";
 import * as expenseApi from "@/api/expenses";
 import * as destinationApi from "@/api/destinations";
-
-const categoryColors: Record<string, string> = {
-  accommodation: "bg-blue-100 text-blue-800",
-  food: "bg-orange-100 text-orange-800",
-  transport: "bg-purple-100 text-purple-800",
-  activity: "bg-green-100 text-green-800",
-  shopping: "bg-pink-100 text-pink-800",
-  other: "bg-gray-100 text-gray-800",
-};
 
 export default function Expenses({
   initialExpenses = [],
@@ -405,7 +397,7 @@ export default function Expenses({
                       <td className="px-6 py-4 text-sm">
                         <span
                           className={`inline-block px-3 py-1 rounded-full text-xs font-medium capitalize ${
-                            categoryColors[expense.category]
+                            getExpenseCategoryColor(expense.category as any)
                           }`}
                         >
                           {expense.category}

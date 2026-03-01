@@ -8,9 +8,23 @@ import Link from "next/link";
 import { FilesList } from "@/components/FilesList";
 import { MediaGallery } from "@/components/MediaGallery";
 import { DestinationCardRow } from "@/components/DestinationCardRow";
+import { DestinationMap } from "@/components/DestinationMap";
 import { ActivityRecommendations } from "@/components/ActivityRecommendations";
 import { Timeline } from "@/components/Timeline";
 import { TravelerRequestsModal } from "@/components/TravelerRequestsModal";
+import {
+  TRIP_GOALS,
+  TRIP_STATUSES,
+  FILE_CATEGORIES,
+  EXPENSE_CATEGORIES,
+  EXPENSE_CATEGORY_COLORS,
+  DESTINATION_STATUSES,
+  getExpenseCategoryColor,
+  type TripGoal,
+  type TripStatus,
+  type FileCategory,
+  type ExpenseCategory,
+} from "@/lib/constants";
 
 interface TripData {
   trip: Trip;
@@ -58,6 +72,7 @@ export default function TripDetails() {
   const [deletingFile, setDeletingFile] = useState(false);
   const [documentFilter, setDocumentFilter] = useState<"all" | "document" | "ticket" | "picture" | "video" | "other">("all");
   const [destinationFilter, setDestinationFilter] = useState<"all" | "proposed" | "accepted" | "planned" | "visited">("all");
+  const [destinationViewMode, setDestinationViewMode] = useState<"list" | "map">("list");
   const [showAddActivityModal, setShowAddActivityModal] = useState(false);
   const [selectedActivityDestination, setSelectedActivityDestination] = useState<string>("");
   const [activityForm, setActivityForm] = useState({
@@ -103,10 +118,12 @@ export default function TripDetails() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [showTravelerRequestsModal, setShowTravelerRequestsModal] = useState(false);
 
-  const goals = ["relaxation", "adventure", "work", "cultural", "food", "family", "other"] as const;
-  const statuses = ["planning", "active", "completed", "cancelled"] as const;
-  const fileCategories = ["document", "ticket", "picture", "other"] as const;
-  const expenseCategories = ["accommodation", "food", "transport", "activity", "shopping", "other"] as const;
+  // Use constants instead of local definitions
+  const goals = TRIP_GOALS;
+  const statuses = TRIP_STATUSES;
+  const fileCategories = FILE_CATEGORIES;
+  const expenseCategories = EXPENSE_CATEGORIES;
+  const categoryColors = EXPENSE_CATEGORY_COLORS;
 
   useEffect(() => {
     if (!id) return;
@@ -719,30 +736,64 @@ export default function TripDetails() {
           <div className="bg-white rounded-lg shadow p-6 border-t-4 border-blue-500 mb-8">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-2xl font-bold text-gray-800">🌍 TRIP DESTINATIONS</h3>
-              <select
-                value={destinationFilter}
-                onChange={(e) => setDestinationFilter(e.target.value as any)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="all">All Destinations</option>
-                <option value="proposed">Proposed</option>
-                <option value="accepted">Accepted</option>
-                <option value="planned">Planned</option>
-                <option value="visited">Visited</option>
-              </select>
+              <div className="flex items-center gap-3">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setDestinationViewMode("list")}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      destinationViewMode === "list"
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    📋 List
+                  </button>
+                  <button
+                    onClick={() => setDestinationViewMode("map")}
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                      destinationViewMode === "map"
+                        ? "bg-blue-500 text-white"
+                        : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+                    }`}
+                  >
+                    🗺️ Map
+                  </button>
+                </div>
+                <select
+                  value={destinationFilter}
+                  onChange={(e) => setDestinationFilter(e.target.value as any)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="all">All Destinations</option>
+                  {DESTINATION_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {status.charAt(0).toUpperCase() + status.slice(1)}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div className="space-y-4">
-              {destinations
-                .filter((dest) => destinationFilter === "all" || dest.status === destinationFilter)
-                .map((dest) => (
-                <DestinationCardRow
-                  key={dest.id}
-                  destination={dest}
-                  files={tripFiles}
-                  activities={activities}
-                />
-              ))}
-            </div>
+            {destinationViewMode === "list" ? (
+              <div className="space-y-4">
+                {destinations
+                  .filter((dest) => destinationFilter === "all" || dest.status === destinationFilter)
+                  .map((dest) => (
+                  <DestinationCardRow
+                    key={dest.id}
+                    destination={dest}
+                    files={tripFiles}
+                    activities={activities}
+                  />
+                ))}
+              </div>
+            ) : (
+              <DestinationMap
+                key={`trip-map-${destinationViewMode}`}
+                destinations={destinations.filter(
+                  (dest) => destinationFilter === "all" || dest.status === destinationFilter
+                )}
+              />
+            )}
           </div>
         )}
 

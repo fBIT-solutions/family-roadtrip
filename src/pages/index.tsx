@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import axios from "axios";
 import { Trip, Destination } from "@/types/schema";
+import { TRIP_GOALS } from "@/lib/constants";
 import { Topbar } from "@/components/Topbar";
 
 export default function Home() {
@@ -49,8 +50,6 @@ export default function Home() {
   const [showAddToTripModal, setShowAddToTripModal] = useState(false);
   const [selectedPublicDestination, setSelectedPublicDestination] = useState<Destination | null>(null);
   const [selectedTripForDestination, setSelectedTripForDestination] = useState<string>("");
-
-  const goals = ["relaxation", "adventure", "work", "cultural", "food", "family", "other"] as const;
 
   useEffect(() => {
     if (session) {
@@ -495,7 +494,7 @@ export default function Home() {
                     onChange={(e) => setFormData({ ...formData, goal: e.target.value as any })}
                     className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
-                    {goals.map((g) => (
+                    {TRIP_GOALS.map((g) => (
                       <option key={g} value={g}>
                         {g.charAt(0).toUpperCase() + g.slice(1)}
                       </option>

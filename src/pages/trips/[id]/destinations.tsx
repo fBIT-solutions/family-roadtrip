@@ -360,9 +360,10 @@ export default function TripDestinations() {
           </div>
         </div>
 
+        {/* Map View - Only render when user switches to map mode */}
         {viewMode === "map" && !loading && destinations.length > 0 && (
           <div className="bg-white p-6 rounded-lg shadow mb-8">
-            <DestinationMap destinations={destinations as any} />
+            <DestinationMap key={`map-${viewMode}`} destinations={destinations as any} />
           </div>
         )}
 

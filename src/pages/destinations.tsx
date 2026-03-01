@@ -8,6 +8,7 @@ import Link from "next/link";
 import axios from "axios";
 import { toast } from "sonner";
 import { Destination, ItemReference, FileMetadata, Trip } from "@/types/schema";
+import { DESTINATION_STATUS_COLORS, getDestinationStatusColor } from "@/lib/constants";
 import { DestinationMap } from "@/components/DestinationMap";
 import { DestinationRecommendations } from "@/components/DestinationRecommendations";
 import { QuickFileLinks } from "@/components/QuickFileLinks";
@@ -15,13 +16,6 @@ import { Topbar } from "@/components/Topbar";
 import { isViewer } from "@/lib/auth-helpers";
 import * as destinationApi from "@/api/destinations";
 
-
-const statusColors: Record<string, string> = {
-  proposed: "bg-indigo-100 text-indigo-800",
-  accepted: "bg-amber-100 text-amber-800",
-  planned: "bg-blue-100 text-blue-800",
-  visited: "bg-emerald-100 text-emerald-800",
-};
 
 export default function Destinations({
   initialDestinations = [],
@@ -445,7 +439,7 @@ export default function Destinations({
                         <div className="p-4 flex flex-col flex-1">
                           <div className="flex justify-between items-start mb-2 gap-2">
                             <h3 className="text-lg font-bold text-gray-800 flex-1">{dest.name}</h3>
-                            <span className={`px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${statusColors[dest.status as keyof typeof statusColors]}`}>
+                            <span className={`px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${getDestinationStatusColor(dest.status as any)}`}>
                               {dest.status}
                             </span>
                           </div>

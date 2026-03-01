@@ -87,23 +87,52 @@ export default async function handler(
 
     if (req.method === "PUT") {
       const { totalBudget, currency, notes } = req.body;
-      const updates: Partial<TripBudget> = {};
+      const tripId = req.query.tripId as string;
 
+      if (!tripId) {
+        return res.status(400).json({ error: "Missing required parameter: tripId" });
+      }
+
+      const trip = await tripsApi.getTrip(tripId);
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      if (!canViewTripBudget(trip, userEmail)) {
+        return res.status(403).json({ error: "You do not have permission to edit this trip's budget" });
+      }
+
+      const updates: Partial<TripBudget> = {};
       if (totalBudget !== undefined) updates.totalBudget = parseFloat(totalBudget);
       if (currency !== undefined) updates.currency = currency;
       if (notes !== undefined) updates.notes = notes;
 
-      const tripBudget = await budgetApi.updateTripBudget(updates);
+      const tripBudget = await budgetApi.updateTripBudget(tripId, updates);
       return res.status(200).json(tripBudget);
     }
 
     if (req.method === "DELETE") {
+      const tripId = req.query.tripId as string;
+
+      if (!tripId) {
+        return res.status(400).json({ error: "Missing required parameter: tripId" });
+      }
+
+      const trip = await tripsApi.getTrip(tripId);
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
+      if (!canViewTripBudget(trip, userEmail)) {
+        return res.status(403).json({ error: "You do not have permission to delete this trip's budget" });
+      }
+
       // For demo purposes, we'll just clear the budget
-      const tripBudget = await budgetApi.getTripBudget();
+      const tripBudget = await budgetApi.getTripBudget(tripId);
       if (!tripBudget) {
         return res.status(404).json({ error: "Trip budget not found" });
       }
-      await budgetApi.updateTripBudget({ totalBudget: 0, destinationBudgets: [] });
+      await budgetApi.updateTripBudget(tripId, { totalBudget: 0, destinationBudgets: [] });
       return res.status(200).json({ message: "Trip budget cleared" });
     }
 
