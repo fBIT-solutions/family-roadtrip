@@ -6,6 +6,7 @@ import { authOptions } from "./api/auth/[...nextauth]";
 import type { GetServerSideProps } from "next";
 import Link from "next/link";
 import axios from "axios";
+import { toast } from "sonner";
 import { Destination, ItemReference, FileMetadata, Trip } from "@/types/schema";
 import { DestinationMap } from "@/components/DestinationMap";
 import { DestinationRecommendations } from "@/components/DestinationRecommendations";
@@ -143,7 +144,12 @@ export default function Destinations({
       setNewLongitude("");
       setNewStatus("proposed");
       setNewPublic(false);
+      toast.success(`Destination "${response.data.name}" added successfully!`);
     } catch (error) {
+      const errorMsg = axios.isAxiosError(error) 
+        ? error.response?.data?.error || error.message 
+        : String(error);
+      toast.error(`Failed to add destination: ${errorMsg}`);
       console.error("Error adding destination:", error);
     }
   };
@@ -152,7 +158,12 @@ export default function Destinations({
     try {
       await axios.post(`/api/destinations/${id}?action=vote`);
       fetchDestinations();
+      toast.success("Vote recorded successfully!");
     } catch (error) {
+      const errorMsg = axios.isAxiosError(error) 
+        ? error.response?.data?.error || error.message 
+        : String(error);
+      toast.error(`Failed to vote: ${errorMsg}`);
       console.error("Error voting:", error);
     }
   };
@@ -168,7 +179,12 @@ export default function Destinations({
       setDestinations(destinations.map(d => 
         d.id === id ? { ...d, public: newPublicStatus } : d
       ));
+      toast.success(`Destination is now ${newPublicStatus ? "public" : "private"}`);
     } catch (error) {
+      const errorMsg = axios.isAxiosError(error) 
+        ? error.response?.data?.error || error.message 
+        : String(error);
+      toast.error(`Failed to update public status: ${errorMsg}`);
       console.error("Error toggling public status:", error);
     }
   };
@@ -182,7 +198,12 @@ export default function Destinations({
       
       // Refresh data
       fetchDestinations();
+      toast.success("Destination added to your collection!");
     } catch (error) {
+      const errorMsg = axios.isAxiosError(error) 
+        ? error.response?.data?.error || error.message 
+        : String(error);
+      toast.error(`Failed to add destination: ${errorMsg}`);
       console.error("Error adding public destination:", error);
     }
   };
