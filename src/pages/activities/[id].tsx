@@ -3,12 +3,14 @@ import { useRouter } from "next/router";
 import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import axios from "axios";
-import { Activity, Destination, FileMetadata } from "@/types/schema";
+import { Activity, Destination, FileMetadata, Trip } from "@/types/schema";
 import { FilesList } from "@/components/FilesList";
+import { isViewer } from "@/lib/auth-helpers";
 
 interface ActivityData {
   activity: Activity;
   destination?: Destination;
+  trip?: Trip;
 }
 
 export default function ActivityDetail() {
@@ -44,7 +46,31 @@ export default function ActivityDetail() {
     try {
       const response = await axios.get(`/api/activities/${id}`);
       const activity = response.data;
-      setData({ activity, destination: activity.destination });
+      
+      // Try to fetch the destination if not included in activity
+      let destination = activity.destination;
+      let trip: Trip | undefined;
+      
+      if (activity.destinationId && !destination) {
+        try {
+          const destResponse = await axios.get(`/api/destinations/${activity.destinationId}`);
+          destination = destResponse.data;
+        } catch (err) {
+          console.error("Error fetching destination:", err);
+        }
+      }
+      
+      // If destination has a tripId, fetch the trip
+      if (destination?.tripId) {
+        try {
+          const tripResponse = await axios.get(`/api/trips/${destination.tripId}`);
+          trip = tripResponse.data.trip;
+        } catch (err) {
+          console.error("Error fetching trip:", err);
+        }
+      }
+      
+      setData({ activity, destination, trip });
       setFormData({
         name: activity.name,
         description: activity.description || "",
@@ -420,15 +446,25 @@ export default function ActivityDetail() {
         )}
 
         {/* Files Section */}
-        {files.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6 mt-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">📄 ACTIVITY FILES</h2>
-            <FilesList 
-              files={files} 
-              onDelete={handleDeleteFile}
-            />
-          </div>
-        )}
+        {(() => {
+          // Filter files if user is a viewer on the trip
+          const displayFiles = (() => {
+            if (data?.trip && isViewer(data.trip, session?.user?.email)) {
+              return files.filter(f => f.category === "picture" || f.category === "video");
+            }
+            return files;
+          })();
+          
+          return displayFiles.length > 0 && (
+            <div className="bg-white rounded-lg shadow p-6 mt-8">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">📄 ACTIVITY FILES</h2>
+              <FilesList 
+                files={displayFiles} 
+                onDelete={handleDeleteFile}
+              />
+            </div>
+          );
+        })()}
 
         {/* Additional Info */}
         <div className="bg-white rounded-lg shadow p-6 mt-8">

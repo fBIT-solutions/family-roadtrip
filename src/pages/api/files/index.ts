@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/authConfig";
 import * as storageApi from "@/api/storage";
 import * as tripsApi from "@/api/trips";
-import { canViewTripFiles, canUploadTripFiles } from "@/lib/auth-helpers";
+import { canViewTripFiles, canUploadTripFiles, filterFilesForUser, canViewTrip } from "@/lib/auth-helpers";
 
 export const config = {
   api: {
@@ -67,13 +67,17 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           return res.status(404).json({ error: "Trip not found" });
         }
 
-        // Check if user has access to view files in this trip
-        if (!canViewTripFiles(trip, userEmail)) {
-          return res.status(403).json({ error: "You do not have access to this trip's files" });
+        // Check if user has access to view trip
+        if (!canViewTrip(trip, userEmail)) {
+          return res.status(403).json({ error: "You do not have access to this trip" });
         }
 
         const files = await storageApi.getFilesByTripId(tripId);
-        return res.status(200).json(files);
+        
+        // Filter files based on user role (viewers only see pictures and videos)
+        const filteredFiles = filterFilesForUser(files, trip, userEmail);
+        
+        return res.status(200).json(filteredFiles);
       }
 
       // Legacy behavior: get by category

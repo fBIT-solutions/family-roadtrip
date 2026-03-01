@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../auth/[...nextauth]";
 import { getTrip } from "@/api/trips";
 import { uploadFile, getFilesByTripId } from "@/api/storage";
+import { canViewTrip, canUploadTripFiles, filterFilesForUser } from "@/lib/auth-helpers";
 
 export const config = {
   api: {
@@ -22,6 +23,7 @@ export default async function handler(
   }
 
   const { id } = req.query;
+  const userEmail = session.user?.email;
 
   try {
     // Verify trip exists
@@ -30,10 +32,19 @@ export default async function handler(
       return res.status(404).json({ error: "Trip not found" });
     }
 
+    // Check if user can view trip at all
+    if (!canViewTrip(trip, userEmail)) {
+      return res.status(403).json({ error: "You do not have access to this trip" });
+    }
+
     if (req.method === "GET") {
       // Get files for this trip
       const files = await getFilesByTripId(id as string);
-      return res.status(200).json(files);
+      
+      // Filter files based on user role (viewers only see pictures and videos)
+      const filteredFiles = filterFilesForUser(files, trip, userEmail);
+      
+      return res.status(200).json(filteredFiles);
     }
 
     if (req.method === "POST") {
@@ -43,6 +54,11 @@ export default async function handler(
         return res.status(400).json({
           error: "Missing required fields: filename, fileData, category",
         });
+      }
+
+      // Check upload permission (travelers only)
+      if (!canUploadTripFiles(trip, userEmail)) {
+        return res.status(403).json({ error: "You do not have permission to upload files for this trip" });
       }
 
       // Convert base64 to blob
@@ -57,7 +73,7 @@ export default async function handler(
       const fileMetadata = await uploadFile(
         file,
         category as "document" | "ticket" | "picture" | "video" | "other",
-        session.user.email,
+        userEmail,
         id as string,
         destinationId,
         activityId

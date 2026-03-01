@@ -4,12 +4,14 @@ import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import axios from "axios";
 import { toast } from "sonner";
-import { Destination, Activity, FileMetadata } from "@/types/schema";
+import { Destination, Activity, FileMetadata, Trip } from "@/types/schema";
 import { FilesList } from "@/components/FilesList";
+import { isViewer } from "@/lib/auth-helpers";
 
 interface DestinationData {
   destination: Destination;
   activities: Activity[];
+  trip?: Trip;
   budget?: {
     totalBudget: number;
     spent: number;
@@ -68,7 +70,14 @@ export default function DestinationDetail() {
       setDenialReason(null);
       const [destResponse, activitiesResponse] = await Promise.all([
         axios.get(`/api/destinations/${id}`),
-        axios.get(`/api/activities`),
+        axios.get(`/api/activities`).catch((error) => {
+          // If activities endpoint fails, just return empty activities
+          if (error?.response?.status === 403) {
+            console.error("Access denied to activities:", error);
+            return { data: { activities: [] } };
+          }
+          throw error;
+        }),
       ]);
       
       const destination = destResponse.data;
@@ -77,9 +86,21 @@ export default function DestinationDetail() {
         (activity: Activity) => activity.destinationId === id
       );
       
+      // Fetch trip if destination is linked to a trip
+      let trip: Trip | undefined;
+      if (destination.tripId) {
+        try {
+          const tripResponse = await axios.get(`/api/trips/${destination.tripId}`);
+          trip = tripResponse.data?.trip || tripResponse.data;
+        } catch (err) {
+          console.error("Error fetching trip:", err);
+        }
+      }
+      
       setData({
         destination,
         activities: linkedActivities,
+        trip,
         budget: destination.budget,
       });
       setFormData({
@@ -659,15 +680,25 @@ export default function DestinationDetail() {
         </div>
 
         {/* Files Section */}
-        {files.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6 mt-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">📄 DESTINATION FILES</h2>
-            <FilesList 
-              files={files} 
-              onDelete={handleDeleteFile}
-            />
-          </div>
-        )}
+        {(() => {
+          // Filter files if user is a viewer on the trip
+          const displayFiles = (() => {
+            if (data?.trip && isViewer(data.trip, session?.user?.email)) {
+              return files.filter(f => f.category === "picture" || f.category === "video");
+            }
+            return files;
+          })();
+          
+          return displayFiles.length > 0 && (
+            <div className="bg-white rounded-lg shadow p-6 mt-8">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">📄 DESTINATION FILES</h2>
+              <FilesList 
+                files={displayFiles} 
+                onDelete={handleDeleteFile}
+              />
+            </div>
+          );
+        })()}
 
         {/* Additional Info */}
         <div className="bg-white rounded-lg shadow p-6 mt-8">

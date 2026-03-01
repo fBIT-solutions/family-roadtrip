@@ -10,6 +10,7 @@ import { Activity, Destination, FileMetadata, Trip, ItemReference } from "@/type
 import * as activitiesApi from "@/api/activities";
 import * as destinationApi from "@/api/destinations";
 import * as tripsApi from "@/api/trips";
+import { isViewer } from "@/lib/auth-helpers";
 import { toast } from "sonner";
 import { ActivityRecommendations } from "@/components/ActivityRecommendations";
 import { QuickFileLinks } from "@/components/QuickFileLinks";
@@ -704,7 +705,18 @@ export default function Activities({
 
                         {!isReference && 'id' in activity && (
                           <QuickFileLinks 
-                            files={files.filter(f => f.activityId === activity.id)} 
+                            files={(() => {
+                              const activityFiles = files.filter(f => f.activityId === activity.id);
+                              // If activity's destination is in a trip and user is a viewer on that trip, filter files
+                              const destination = destinations.find(d => d.id === activity.destinationId);
+                              if (destination && destination.tripId) {
+                                const destTrip = trip || availableTrips.find(t => t.id === destination.tripId);
+                                if (destTrip && isViewer(destTrip, session?.user?.email)) {
+                                  return activityFiles.filter(f => f.category === "picture" || f.category === "video");
+                                }
+                              }
+                              return activityFiles;
+                            })()} 
                           />
                         )}
 

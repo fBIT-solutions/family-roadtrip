@@ -151,3 +151,41 @@ export function canCreateExpense(trip: Trip, userEmail?: string | null): boolean
 export function canVoteOnItems(trip: Trip, userEmail?: string | null): boolean {
   return canEditTrip(trip, userEmail);
 }
+
+/**
+ * Check if user is a viewer (read-only access) for a trip
+ */
+export function isViewer(trip: Trip, userEmail?: string | null): boolean {
+  if (!userEmail) return false;
+  return trip.viewers.includes(userEmail);
+}
+
+/**
+ * Filter files to show only appropriate categories for viewers
+ * Viewers can only see "picture" and "video" categories
+ */
+export function filterFilesForUser(files: any[], trip: Trip, userEmail?: string | null): any[] {
+  // If user is a viewer, only show picture and video files
+  if (isViewer(trip, userEmail)) {
+    return files.filter(file => file.category === "picture" || file.category === "video");
+  }
+  // Travelers and creators can see all files
+  return files;
+}
+
+/**
+ * Frontend helper: Filter files based on whether destination is in a viewer's trip
+ * This is used client-side when trip info might not always be available
+ */
+export function filterFilesForViewerDisplay(
+  files: any[],
+  destinationTripId?: string,
+  isViewerRole?: boolean
+): any[] {
+  // If destination is in a trip and user is a viewer, filter to pictures and videos only
+  if (destinationTripId && isViewerRole) {
+    return files.filter(file => file.category === "picture" || file.category === "video");
+  }
+  // Otherwise show all files
+  return files;
+}

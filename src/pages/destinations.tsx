@@ -6,12 +6,14 @@ import { authOptions } from "./api/auth/[...nextauth]";
 import type { GetServerSideProps } from "next";
 import Link from "next/link";
 import axios from "axios";
-import { Destination, ItemReference, FileMetadata } from "@/types/schema";
+import { Destination, ItemReference, FileMetadata, Trip } from "@/types/schema";
 import { DestinationMap } from "@/components/DestinationMap";
 import { DestinationRecommendations } from "@/components/DestinationRecommendations";
 import { QuickFileLinks } from "@/components/QuickFileLinks";
 import { Topbar } from "@/components/Topbar";
+import { isViewer } from "@/lib/auth-helpers";
 import * as destinationApi from "@/api/destinations";
+
 
 const statusColors: Record<string, string> = {
   proposed: "bg-indigo-100 text-indigo-800",
@@ -46,17 +48,20 @@ export default function Destinations({
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [files, setFiles] = useState<FileMetadata[]>([]);
   const [publicStatus, setPublicStatus] = useState<Record<string, boolean>>({});
+  const [trips, setTrips] = useState<any[]>([]);
 
   const fetchDestinations = useCallback(async () => {
     try {
-      const [destRes, filesRes] = await Promise.all([
+      const [destRes, filesRes, tripsRes] = await Promise.all([
         axios.get("/api/destinations", { withCredentials: true }),
         axios.get("/api/files", { withCredentials: true }),
+        axios.get("/api/trips", { withCredentials: true }),
       ]);
       const { destinations, itemReferences } = destRes.data;
       setDestinations(destinations || []);
       setItemReferences(itemReferences || []);
       setFiles(filesRes.data);
+      setTrips(tripsRes.data || []);
       setError(null);
       setLoading(false);
     } catch (error) {
@@ -417,12 +422,29 @@ export default function Destinations({
                           />
                         )}
                         <div className="p-4 flex flex-col flex-1">
-                          <div className="flex justify-between items-start mb-2">
+                          <div className="flex justify-between items-start mb-2 gap-2">
                             <h3 className="text-lg font-bold text-gray-800 flex-1">{dest.name}</h3>
-                            <span className={`ml-2 px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${statusColors[dest.status as keyof typeof statusColors]}`}>
+                            <span className={`px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${statusColors[dest.status as keyof typeof statusColors]}`}>
                               {dest.status}
                             </span>
                           </div>
+                          
+                          {/* Trip and Share Status Badges */}
+                          <div className="flex flex-wrap gap-2 mb-2">
+                            {('tripId' in dest) && dest.tripId && (
+                              <span className="bg-purple-100 text-purple-800 px-2 py-1 rounded text-xs font-semibold">
+                                📍 {trips.find(t => t.id === dest.tripId)?.name || 'Loading...'}
+                              </span>
+                            )}
+                            <span className={`px-2 py-1 rounded text-xs font-semibold whitespace-nowrap ${
+                              ('public' in dest) && dest.public
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-100 text-gray-800"
+                            }`}>
+                              {('public' in dest) && dest.public ? "🌐 Public" : "🔒 Private"}
+                            </span>
+                          </div>
+                          
                           <p className="text-gray-600 text-sm">
                             {dest.place}, {dest.country}
                           </p>
@@ -449,7 +471,17 @@ export default function Destinations({
 
                           {!isReference && 'id' in dest && (
                             <QuickFileLinks 
-                              files={files.filter(f => f.destinationId === dest.id)} 
+                              files={(() => {
+                                const destFiles = files.filter(f => f.destinationId === dest.id);
+                                // If destination is in a trip and user is a viewer on that trip, filter files
+                                if (('tripId' in dest) && dest.tripId) {
+                                  const trip = trips.find(t => t.id === dest.tripId);
+                                  if (trip && isViewer(trip, session?.user?.email)) {
+                                    return destFiles.filter(f => f.category === "picture" || f.category === "video");
+                                  }
+                                }
+                                return destFiles;
+                              })()} 
                             />
                           )}
 
@@ -462,13 +494,13 @@ export default function Destinations({
                                   e.stopPropagation();
                                   handleTogglePublic(dest.id);
                                 }}
-                                className={`px-3 py-1 text-sm rounded ${
+                                className={`px-3 py-1 text-sm rounded text-white font-semibold transition ${
                                   ('public' in dest) && dest.public
-                                    ? "bg-green-500 text-white"
-                                    : "bg-gray-300 text-gray-700"
+                                    ? "bg-green-500 hover:bg-green-600"
+                                    : "bg-gray-500 hover:bg-gray-600"
                                 }`}
                               >
-                                {('public' in dest) && dest.public ? "🌐 Public" : "🔒 Private"}
+                                {('public' in dest) && dest.public ? "🌐 Make Private" : "🔒 Make Public"}
                               </button>
                             )}
                             
