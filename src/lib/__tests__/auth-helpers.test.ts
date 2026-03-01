@@ -8,13 +8,17 @@ describe('Auth Helpers', () => {
     createdBy: 'creator@example.com',
     people: ['traveler1@example.com', 'traveler2@example.com'],
     viewers: ['viewer@example.com'],
-    goals: ['adventure', 'family'],
+    goal: 'adventure',
     status: 'planning',
-    startDate: '2028-06-01',
-    endDate: '2028-06-15',
+    startDate: new Date('2028-06-01'),
+    endDate: new Date('2028-06-15'),
+    days: 15,
+    hasPet: false,
+    totalBudget: 5000,
+    currency: 'USD',
     description: 'A great summer adventure',
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: new Date(),
+    updatedAt: new Date(),
   }
 
   describe('getUserTripRole', () => {
