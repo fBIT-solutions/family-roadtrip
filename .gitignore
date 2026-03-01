@@ -11,4 +11,8 @@ dist/
 .vscode/
 .idea/
 .env
-.vercel
+.vercelcoverage/
+.nyc_output/
+coverage/
+.swc/
+.vercel/
