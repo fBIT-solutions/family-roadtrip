@@ -893,16 +893,21 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   try {
     const promises: Promise<any>[] = [
       activitiesApi.getActivities(),
-      destinationApi.getDestinations(),
       tripsApi.getTrips(),
     ];
 
-    const [allActivities, destinationsList, allTrips] = await Promise.all(promises);
+    const [allActivities, allTrips] = await Promise.all(promises);
 
     // Filter trips to only show those the user has access to
     const accessibleTrips = (allTrips as Trip[]).filter((trip: Trip) =>
       canViewTrip(trip, userEmail)
     );
+
+    // Get trip IDs for the user's accessible trips
+    const userTripIds = accessibleTrips.map((trip: Trip) => trip.id);
+
+    // Fetch destinations for the user (includes: user-created, trip-associated, and public)
+    const destinationsList = await destinationApi.getDestinations(userEmail, userTripIds);
 
     let selectedTrip = null;
     let displayDestinations = destinationsList;
