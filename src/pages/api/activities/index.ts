@@ -6,6 +6,7 @@ import * as tripsApi from "@/api/trips";
 import * as destinationsApi from "@/api/destinations";
 import * as itemReferencesApi from "@/api/itemReferences";
 import * as permissionsApi from "@/api/itemPermissions";
+import { notifyNewActivityAdded } from "@/lib/notifications";
 
 type ResponseData = any;
 
@@ -97,6 +98,51 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         },
         destination?.tripId
       );
+
+      // Send notification to trip members/contributors if this activity is added to a trip
+      if (destination?.tripId && userEmail) {
+        console.log(`[ACTIVITY NOTIFICATION] tripId: ${destination.tripId}, userEmail: ${userEmail}`);
+        const trip = await tripsApi.getTrip(destination.tripId);
+        if (trip) {
+          console.log(`[ACTIVITY NOTIFICATION] Trip found: "${trip.name}"`);
+          console.log(`[ACTIVITY NOTIFICATION] trip.people: ${JSON.stringify(trip.people)}`);
+          console.log(`[ACTIVITY NOTIFICATION] trip.viewers: ${JSON.stringify(trip.viewers)}`);
+          
+          // Get all trip members (people + viewers) except the person who added it
+          const recipients = [
+            ...trip.people.filter((p) => p !== userEmail),
+            ...trip.viewers.filter((v) => v !== userEmail),
+          ];
+
+          console.log(`[ACTIVITY NOTIFICATION] Final recipients: ${JSON.stringify(recipients)}`);
+
+          if (recipients.length > 0) {
+            const activityUrl = `${process.env.NEXTAUTH_URL}/activities/${activity.id}`;
+            console.log(`[ACTIVITY NOTIFICATION] Sending notifications to ${recipients.length} recipients`);
+            try {
+              await notifyNewActivityAdded(
+                recipients,
+                activity.name,
+                destination.name,
+                trip.name,
+                userEmail,
+                activityUrl
+              );
+              console.log(`[ACTIVITY NOTIFICATION] Notifications sent successfully`);
+            } catch (emailError) {
+              console.error("Failed to send activity notification emails:", emailError);
+              // Don't fail the request if email fails to send
+            }
+          } else {
+            console.log(`[ACTIVITY NOTIFICATION] No recipients found (creators don't receive notifications)`);
+          }
+        } else {
+          console.log(`[ACTIVITY NOTIFICATION] Trip not found: ${destination.tripId}`);
+        }
+      } else {
+        console.log(`[ACTIVITY NOTIFICATION] Missing tripId or userEmail - tripId: ${destination?.tripId}, userEmail: ${userEmail}`);
+      }
+
       return res.status(201).json(activity);
     } catch (error) {
       console.error("Error creating activity:", error);

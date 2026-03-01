@@ -12,8 +12,8 @@ export async function createDestination(
   const destination: Destination = {
     ...data,
     id: uuidv4(),
-    votes: 0,
-    votedBy: [],
+    votes: creatorEmail ? 1 : 0,
+    votedBy: creatorEmail ? [creatorEmail] : [],
     createdAt: new Date(),
     updatedAt: new Date(),
   };

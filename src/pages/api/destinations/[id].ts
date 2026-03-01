@@ -5,6 +5,7 @@ import { canViewTrip } from "@/lib/auth-helpers";
 import * as destinationApi from "@/api/destinations";
 import * as tripsApi from "@/api/trips";
 import * as permissionsApi from "@/api/itemPermissions";
+import { notifyStatusChanged } from "@/lib/notifications";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -86,10 +87,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(403).json({ error: "You do not have permission to edit this destination" });
       }
 
+      const oldStatus = destination.status;
       const updated = await destinationApi.updateDestination(id as string, req.body);
       if (!updated) {
         return res.status(404).json({ error: "Destination not found" });
       }
+
+      // Send notification to trip members if status changed
+      if (oldStatus !== updated.status && destination.tripId && userEmail) {
+        try {
+          const trip = await tripsApi.getTrip(destination.tripId);
+          if (trip) {
+            // Get all trip members except the person who made the change
+            const recipients = [
+              ...trip.people.filter((p) => p !== userEmail),
+              ...trip.viewers.filter((v) => v !== userEmail),
+            ];
+
+            if (recipients.length > 0) {
+              const destinationUrl = `${process.env.NEXTAUTH_URL}/destinations/${id}`;
+              try {
+                await notifyStatusChanged(
+                  recipients,
+                  updated.name,
+                  "destination",
+                  oldStatus,
+                  updated.status,
+                  userEmail,
+                  destinationUrl
+                );
+              } catch (emailError) {
+                console.error("Failed to send status change notification email:", emailError);
+                // Don't fail the request if email fails to send
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error sending status change notification:", error);
+        }
+      }
+
       res.status(200).json(updated);
     } catch (error) {
       res.status(500).json({ error: "Failed to update destination" });

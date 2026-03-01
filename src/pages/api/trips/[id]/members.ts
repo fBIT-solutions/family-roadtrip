@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "../../auth/[...nextauth]";
 import * as tripsApi from "@/api/trips";
 import * as permissionsApi from "@/api/itemPermissions";
+import { notifyUserAddedToTrip, notifyUserRemovedFromTrip } from "@/lib/notifications";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -32,11 +33,32 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: "Invalid email or role" });
       }
 
+      // Get trip details for notification
+      const trip = await tripsApi.getTrip(id);
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
       // Add member based on role
       if (role === "contributor") {
         await tripsApi.addTravelerToTrip(id, email);
       } else {
         await tripsApi.addViewerToTrip(id, email);
+      }
+
+      // Send notification email to the newly added member
+      const tripUrl = `${process.env.NEXTAUTH_URL}/trips/${id}`;
+      try {
+        await notifyUserAddedToTrip(
+          [email],
+          email.split("@")[0], // Use email prefix as name
+          trip.name,
+          userEmail || "Unknown",
+          tripUrl
+        );
+      } catch (emailError) {
+        console.error("Failed to send notification email:", emailError);
+        // Don't fail the request if email fails to send
       }
 
       res.status(200).json({ success: true });
@@ -58,6 +80,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(400).json({ error: "Email is required" });
       }
 
+      // Get trip details for notification
+      const trip = await tripsApi.getTrip(id);
+      if (!trip) {
+        return res.status(404).json({ error: "Trip not found" });
+      }
+
       // Get user's role to determine removal method
       const userRole = await permissionsApi.getUserPermissionRole(id, email);
       
@@ -65,6 +93,18 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         await tripsApi.removeTravelerFromTrip(id, email);
       } else if (userRole === "reader") {
         await tripsApi.removeViewerFromTrip(id, email);
+      }
+
+      // Send notification email to the removed member
+      try {
+        await notifyUserRemovedFromTrip(
+          email,
+          email.split("@")[0], // Use email prefix as name
+          trip.name
+        );
+      } catch (emailError) {
+        console.error("Failed to send notification email:", emailError);
+        // Don't fail the request if email fails to send
       }
 
       res.status(200).json({ success: true });
