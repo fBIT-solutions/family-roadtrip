@@ -71,7 +71,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
   }
 
   if (req.method === "POST") {
-    const { name, destinationId, category, description, url, estimatedCost, duration, status } = req.body;
+    const { name, destinationId, category, description, location, latitude, longitude, mainPhotoUrl, url, estimatedCost, duration, status } = req.body;
 
     if (!name || !destinationId) {
       return res.status(400).json({ error: "Missing required fields: name, destinationId" });
@@ -86,6 +86,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         {
           category,
           description,
+          location,
+          latitude,
+          longitude,
+          mainPhotoUrl,
           url,
           estimatedCost,
           duration,

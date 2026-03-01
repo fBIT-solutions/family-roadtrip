@@ -163,6 +163,10 @@ export const ActivitySchema = z.object({
   id: z.string().uuid(),
   name: z.string(),
   description: z.string().optional(),
+  location: z.string().optional(), // City, address, or venue name
+  latitude: z.number().optional(), // Coordinates for the activity location
+  longitude: z.number().optional(),
+  mainPhotoUrl: z.union([z.literal(""), z.string().url()]).optional(), // Main photo for the activity
   destinationId: z.string().uuid().optional(), // Link to destination (optional - can be assigned later)
   tripId: z.string().uuid().optional(), // Link to trip
   category: z.enum(["outdoor", "cultural", "food", "nightlife", "shopping", "sports", "relaxation", "adventure", "other"]).default("other"),

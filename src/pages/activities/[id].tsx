@@ -22,6 +22,7 @@ export default function ActivityDetail() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [files, setFiles] = useState<FileMetadata[]>([]);
+  const [coordinateFetching, setCoordinateFetching] = useState(false);
 
   // Edit form state
   const [formData, setFormData] = useState({
@@ -33,6 +34,10 @@ export default function ActivityDetail() {
     currency: "USD",
     duration: "",
     status: "suggested" as const,
+    location: "",
+    latitude: undefined as number | undefined,
+    longitude: undefined as number | undefined,
+    mainPhotoUrl: "",
   });
 
   useEffect(() => {
@@ -47,6 +52,17 @@ export default function ActivityDetail() {
       fetchFiles();
     }
   }, [id, data]);
+
+  // Debounced coordinate fetching
+  useEffect(() => {
+    if (!isEditing || !formData.location) return;
+    
+    const timer = setTimeout(() => {
+      fetchCoordinates(formData.location);
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [formData.location, isEditing]);
 
   const fetchData = async () => {
     try {
@@ -86,6 +102,10 @@ export default function ActivityDetail() {
         currency: activity.currency,
         duration: activity.duration || "",
         status: activity.status,
+        location: activity.location || "",
+        latitude: activity.latitude,
+        longitude: activity.longitude,
+        mainPhotoUrl: activity.mainPhotoUrl || "",
       });
     } catch (error) {
       console.error("Error fetching activity:", error);
@@ -111,6 +131,33 @@ export default function ActivityDetail() {
     } catch (error) {
       console.error("Error fetching files:", error);
       setFiles([]);
+    }
+  };
+
+  const fetchCoordinates = async (location: string) => {
+    if (!location.trim()) {
+      setFormData((prev) => ({
+        ...prev,
+        latitude: undefined,
+        longitude: undefined,
+      }));
+      return;
+    }
+
+    setCoordinateFetching(true);
+    try {
+      const response = await axios.get("/api/coordinates", {
+        params: { location },
+      });
+      setFormData((prev) => ({
+        ...prev,
+        latitude: response.data.latitude,
+        longitude: response.data.longitude,
+      }));
+    } catch (error) {
+      console.error("Error fetching coordinates:", error);
+    } finally {
+      setCoordinateFetching(false);
     }
   };
 
@@ -269,6 +316,46 @@ export default function ActivityDetail() {
               />
             </div>
 
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Location (Address or Venue Name)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={formData.location}
+                  onChange={(e) =>
+                    setFormData({ ...formData, location: e.target.value })
+                  }
+                  placeholder="e.g., Eiffel Tower, Paris"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              {coordinateFetching && (
+                <p className="text-sm text-yellow-600 mt-1">Fetching coordinates...</p>
+              )}
+              {formData.latitude !== undefined && formData.longitude !== undefined && (
+                <p className="text-sm text-green-600 mt-1">
+                  ✓ Coordinates found: {formData.latitude.toFixed(4)}, {formData.longitude.toFixed(4)}
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                Photo URL
+              </label>
+              <input
+                type="url"
+                value={formData.mainPhotoUrl}
+                onChange={(e) =>
+                  setFormData({ ...formData, mainPhotoUrl: e.target.value })
+                }
+                placeholder="https://example.com/photo.jpg"
+                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
@@ -391,6 +478,16 @@ export default function ActivityDetail() {
         {/* Activity Details */}
         {!isEditing && (
           <>
+            {formData.mainPhotoUrl && (
+              <div className="bg-white rounded-lg shadow overflow-hidden mb-8">
+                <img
+                  src={formData.mainPhotoUrl}
+                  alt={formData.name}
+                  className="w-full h-64 object-cover"
+                />
+              </div>
+            )}
+
             {formData.description && (
               <div className="bg-white rounded-lg shadow p-6 mb-8">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">
@@ -399,6 +496,20 @@ export default function ActivityDetail() {
                 <p className="text-gray-700 text-lg leading-relaxed">
                   {formData.description}
                 </p>
+              </div>
+            )}
+
+            {formData.location && (
+              <div className="bg-white rounded-lg shadow p-6 mb-8">
+                <h2 className="text-2xl font-bold text-gray-800 mb-4">
+                  📍 Location
+                </h2>
+                <p className="text-gray-700 text-lg">{formData.location}</p>
+                {formData.latitude !== undefined && formData.longitude !== undefined && (
+                  <p className="text-gray-600 text-sm mt-2">
+                    Coordinates: {formData.latitude.toFixed(4)}, {formData.longitude.toFixed(4)}
+                  </p>
+                )}
               </div>
             )}
 

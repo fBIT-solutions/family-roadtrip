@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/router";
 import axios from "axios";
 import Link from "next/link";
-import { Trip, Destination } from "@/types/schema";
+import { Trip, Destination, Activity } from "@/types/schema";
 import { DestinationMap } from "@/components/DestinationMap";
 
 interface TripDestinationsData {
@@ -24,12 +24,15 @@ export default function TripDestinations() {
   const { id } = router.query;
   const [data, setData] = useState<TripDestinationsData | null>(null);
   const [allDestinations, setAllDestinations] = useState<Destination[]>([]);
+  const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     place: "",
@@ -63,15 +66,28 @@ export default function TripDestinations() {
 
   const fetchData = async () => {
     try {
-      const response = await axios.get(`/api/trips/${id}`);
+      const [tripResponse, allDestsResponse, activitiesResponse] = await Promise.all([
+        axios.get(`/api/trips/${id}`),
+        axios.get("/api/destinations"),
+        axios.get(`/api/activities?tripId=${id}`),
+      ]);
+      
       setData({
-        trip: response.data.trip,
-        destinations: response.data.destinations,
+        trip: tripResponse.data.trip,
+        destinations: tripResponse.data.destinations,
       });
       
-      // Also fetch all destinations to show unlinked ones
-      const allDestsResponse = await axios.get("/api/destinations");
-      setAllDestinations(allDestsResponse.data);
+      // Handle both response formats: { destinations, itemReferences } or array
+      const allDests = Array.isArray(allDestsResponse.data)
+        ? allDestsResponse.data
+        : (allDestsResponse.data.destinations || []);
+      setAllDestinations(allDests);
+      
+      // Handle activities response format
+      const fetchedActivities = Array.isArray(activitiesResponse.data)
+        ? activitiesResponse.data
+        : (activitiesResponse.data.activities || []);
+      setActivities(fetchedActivities);
     } catch (error) {
       console.error("Error fetching trip data:", error);
     } finally {
@@ -351,19 +367,27 @@ export default function TripDestinations() {
             >
               🗺️ Map
             </button>
-            <button
-              onClick={handleOpenAddModal}
-              className="flex-1 sm:flex-initial px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
-            >
-              + Add
-            </button>
+            <div className="flex-1 sm:flex-initial flex gap-2">
+              <button
+                onClick={handleOpenAddModal}
+                className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold text-sm"
+              >
+                ➕ Create New
+              </button>
+              <button
+                onClick={() => setShowLinkModal(true)}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-sm"
+              >
+                🔗 Link Existing
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Map View - Only render when user switches to map mode */}
         {viewMode === "map" && !loading && destinations.length > 0 && (
           <div className="bg-white p-6 rounded-lg shadow mb-8">
-            <DestinationMap key={`map-${viewMode}`} destinations={destinations as any} />
+            <DestinationMap key={`map-${viewMode}`} destinations={destinations as any} activities={activities} />
           </div>
         )}
 
@@ -443,91 +467,123 @@ export default function TripDestinations() {
             )}
           </>
         )}
-
-        {/* Available Destinations Section */}
-        {data && allDestinations.length > 0 && (
-          <>
-            <div className="mt-12">
-              <h3 className="text-2xl font-bold text-gray-800 mb-6">
-                Available Destinations
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {allDestinations
-                  .filter((dest) => !data.destinations.find((d) => d.id === dest.id))
-                  .map((dest) => (
-                    <div
-                      key={dest.id}
-                      onClick={() => router.push(`/destinations/${dest.id}`)}
-                      className="bg-white rounded-lg shadow hover:shadow-lg transition overflow-hidden border-l-4 border-green-500 cursor-pointer"
-                    >
-                      {dest.mainPhotoUrl && (
-                        <div className="relative w-full h-40 bg-gray-200">
-                          <img
-                            src={dest.mainPhotoUrl}
-                            alt={dest.name}
-                            className="w-full h-full object-cover"
-                          />
-                        </div>
-                      )}
-                      
-                      <div className="p-6">
-                        <div className="flex justify-between items-start mb-3">
-                          <div>
-                            <h3 className="text-xl font-bold text-gray-800">{dest.name}</h3>
-                            <p className="text-sm text-gray-600">{dest.place}, {dest.country}</p>
-                          </div>
-                          <span className={`px-2 py-1 text-xs rounded font-semibold ${
-                            dest.status === "proposed" ? "bg-yellow-100 text-yellow-800" :
-                            dest.status === "accepted" ? "bg-green-100 text-green-800" :
-                            dest.status === "planned" ? "bg-blue-100 text-blue-800" :
-                            "bg-purple-100 text-purple-800"
-                          }`}>
-                            {dest.status}
-                          </span>
-                        </div>
-
-                        {dest.description && (
-                          <p className="text-gray-600 text-sm mb-3">{dest.description}</p>
-                        )}
-
-                        <div className="space-y-2 text-sm text-gray-700 mb-4">
-                          {dest.estimatedBudget && (
-                            <div>💰 {dest.currency} {dest.estimatedBudget.toLocaleString()}</div>
-                          )}
-                          <div>👍 {dest.votes} votes</div>
-                        </div>
-
-                        <button
-                          onClick={async () => {
-                            try {
-                              // Update the destination to link it to this trip
-                              await axios.put(`/api/destinations/${dest.id}`, {
-                                tripId: id,
-                              });
-                              await fetchData();
-                            } catch (error) {
-                              console.error("Error adding destination:", error);
-                              alert("Failed to add destination");
-                            }
-                          }}
-                          className="w-full px-3 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700 transition"
-                        >
-                          Add to This Trip
-                        </button>
-                        <button
-                          onClick={() => handleOpenEditModal(dest)}
-                          className="w-full px-3 py-2 text-sm text-blue-600 hover:bg-blue-50 rounded transition"
-                        >
-                          ✏️ Edit
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-              </div>
-            </div>
-          </>
-        )}
       </div>
+
+      {/* Link Existing Destination Modal */}
+      {showLinkModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="text-2xl font-bold text-gray-800">Link Existing Destination</h3>
+              <button
+                onClick={() => {
+                  setShowLinkModal(false);
+                  setSearchQuery("");
+                }}
+                className="text-2xl text-gray-600 hover:text-gray-800"
+              >
+                ×
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="mb-6">
+              <input
+                type="text"
+                placeholder="Search destinations by name, place, or country..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            {/* Destinations Grid */}
+            <div>
+              {allDestinations
+                .filter((dest) => !data?.destinations.find((d) => d.id === dest.id))
+                .filter(
+                  (dest) =>
+                    searchQuery === "" ||
+                    dest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    dest.place.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    dest.country.toLowerCase().includes(searchQuery.toLowerCase())
+                ).length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <p>No available destinations found</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {allDestinations
+                    .filter((dest) => !data?.destinations.find((d) => d.id === dest.id))
+                    .filter(
+                      (dest) =>
+                        searchQuery === "" ||
+                        dest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        dest.place.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        dest.country.toLowerCase().includes(searchQuery.toLowerCase())
+                    )
+                    .map((dest) => (
+                      <div key={dest.id} className="border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition">
+                        {dest.mainPhotoUrl && (
+                          <div className="relative w-full h-32 bg-gray-200">
+                            <img
+                              src={dest.mainPhotoUrl}
+                              alt={dest.name}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        )}
+                        <div className="p-4">
+                          <h4 className="font-bold text-gray-800">{dest.name}</h4>
+                          <p className="text-xs text-gray-600">{dest.place}, {dest.country}</p>
+                          {dest.description && <p className="text-xs text-gray-600 mt-2 line-clamp-2">{dest.description}</p>}
+                          <div className="mt-3 flex gap-2">
+                            <button
+                              onClick={async () => {
+                                try {
+                                  await axios.put(`/api/destinations/${dest.id}`, {
+                                    tripId: id,
+                                  });
+                                  await fetchData();
+                                  setShowLinkModal(false);
+                                  setSearchQuery("");
+                                } catch (error) {
+                                  console.error("Error adding destination:", error);
+                                  alert("Failed to add destination");
+                                }
+                              }}
+                              className="flex-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 transition font-semibold"
+                            >
+                              Add
+                            </button>
+                            <button
+                              onClick={() => router.push(`/destinations/${dest.id}`)}
+                              className="flex-1 px-2 py-1 text-xs border border-gray-300 text-gray-700 rounded hover:bg-gray-50 transition"
+                            >
+                              View
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 mt-6 pt-4 border-t">
+              <button
+                onClick={() => {
+                  setShowLinkModal(false);
+                  setSearchQuery("");
+                }}
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-700 rounded hover:bg-gray-400"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Destination Modal */}
       {showAddModal && (

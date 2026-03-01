@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Destination } from "@/types/schema";
+import { Destination, Activity } from "@/types/schema";
 
 // CRITICAL: Must use dynamic import with ssr: false because Leaflet uses window object
 const MapComponent = dynamic(() => import("./MapComponent"), {
@@ -14,6 +14,7 @@ const MapComponent = dynamic(() => import("./MapComponent"), {
 
 interface DestinationMapProps {
   destinations: Destination[];
+  activities?: Activity[];
   onDestinationClick?: (destination: Destination) => void;
 }
 

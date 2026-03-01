@@ -49,6 +49,10 @@ export default function Activities({
   );
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [location, setLocation] = useState(""); // City, venue, or address
+  const [latitude, setLatitude] = useState<number | null>(null); // Activity location coordinates
+  const [longitude, setLongitude] = useState<number | null>(null);
+  const [mainPhotoUrl, setMainPhotoUrl] = useState(""); // Main photo URL
   const [category, setCategory] = useState<"outdoor" | "cultural" | "food" | "nightlife" | "shopping" | "sports" | "relaxation" | "adventure" | "other">("outdoor");
   const [url, setUrl] = useState("");
   const [estimatedCost, setEstimatedCost] = useState("");
@@ -84,6 +88,41 @@ export default function Activities({
       setError("Failed to fetch activities");
     }
   }, [selectedDestination, tripId]);
+
+  // Fetch coordinates from API when location is provided
+  const fetchCoordinates = useCallback(async (locationStr: string) => {
+    if (!locationStr) {
+      setLatitude(null);
+      setLongitude(null);
+      return;
+    }
+
+    try {
+      const response = await axios.get("/api/coordinates", {
+        params: { place: locationStr },
+      });
+
+      if (response.data.latitude && response.data.longitude) {
+        setLatitude(response.data.latitude);
+        setLongitude(response.data.longitude);
+        console.log(`Coordinates fetched: ${response.data.latitude}, ${response.data.longitude}`);
+      }
+    } catch (error) {
+      console.error("Error fetching coordinates:", error);
+      // Silently fail - user can still add activity without coordinates
+    }
+  }, []);
+
+  // Auto-fetch coordinates when location changes (with debounce)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (location) {
+        fetchCoordinates(location);
+      }
+    }, 500); // Debounce for 500ms
+
+    return () => clearTimeout(timer);
+  }, [location, fetchCoordinates]);
 
   useEffect(() => {
     fetchActivities();
@@ -132,6 +171,10 @@ export default function Activities({
         await axios.put(`/api/activities/${editingId}`, {
           name,
           description: description || undefined,
+          location: location || undefined,
+          latitude: latitude || undefined,
+          longitude: longitude || undefined,
+          mainPhotoUrl: mainPhotoUrl || undefined,
           category,
           url: url || undefined,
           estimatedCost: estimatedCost ? parseFloat(estimatedCost) : undefined,
@@ -147,6 +190,10 @@ export default function Activities({
           destinationId: activityDestination || undefined,
           tripId: tripId || undefined,
           description: description || undefined,
+          location: location || undefined,
+          latitude: latitude || undefined,
+          longitude: longitude || undefined,
+          mainPhotoUrl: mainPhotoUrl || undefined,
           category,
           url: url || undefined,
           estimatedCost: estimatedCost ? parseFloat(estimatedCost) : undefined,
@@ -158,6 +205,10 @@ export default function Activities({
       // Reset form
       setName("");
       setDescription("");
+      setLocation("");
+      setLatitude(null);
+      setLongitude(null);
+      setMainPhotoUrl("");
       setCategory("outdoor");
       setUrl("");
       setEstimatedCost("");
@@ -230,6 +281,10 @@ export default function Activities({
   const handleEdit = (activity: Activity) => {
     setName(activity.name);
     setDescription(activity.description || "");
+    setLocation(activity.location || "");
+    setLatitude((activity as any).latitude || null);
+    setLongitude((activity as any).longitude || null);
+    setMainPhotoUrl(activity.mainPhotoUrl || "");
     setCategory(activity.category);
     setUrl(activity.url || "");
     setEstimatedCost(activity.estimatedCost?.toString() || "");
@@ -401,6 +456,29 @@ export default function Activities({
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Location (optional)
+                </label>
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="e.g., Paris, France or Champs-Élysées"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                {latitude && longitude && (
+                  <p className="text-xs text-green-600 mt-1">
+                    ✓ Coordinates found: {latitude.toFixed(4)}, {longitude.toFixed(4)}
+                  </p>
+                )}
+                {location && !latitude && !longitude && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    Fetching coordinates...
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Category
                 </label>
                 <select
@@ -459,6 +537,19 @@ export default function Activities({
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
+
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Photo URL (optional, main image for this activity)
+                </label>
+                <input
+                  type="url"
+                  value={mainPhotoUrl}
+                  onChange={(e) => setMainPhotoUrl(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
 
             <div className="mb-4">
@@ -489,6 +580,10 @@ export default function Activities({
                     setEditingId(null);
                     setName("");
                     setDescription("");
+                    setLocation("");
+                    setLatitude(null);
+                    setLongitude(null);
+                    setMainPhotoUrl("");
                     setCategory("outdoor");
                     setUrl("");
                     setEstimatedCost("");
@@ -519,6 +614,10 @@ export default function Activities({
                       destinationId: selectedDestination,
                       tripId: tripId || undefined,
                       description: activity.description || undefined,
+                      location: activity.location || undefined,
+                      latitude: (activity as any).latitude || undefined,
+                      longitude: (activity as any).longitude || undefined,
+                      mainPhotoUrl: activity.mainPhotoUrl || undefined,
                       category: activity.category,
                       url: activity.url || undefined,
                       estimatedCost: activity.estimatedCost,
@@ -660,8 +759,22 @@ export default function Activities({
                     return (
                       <div
                         key={activity.id}
-                        className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow"
+                        className="bg-white rounded-lg shadow p-6 hover:shadow-lg transition-shadow overflow-hidden"
                       >
+                        {/* Activity Photo */}
+                        {('mainPhotoUrl' in activity) && activity.mainPhotoUrl && (
+                          <div className="mb-4 -mx-6 -mt-6 rounded-t-lg overflow-hidden">
+                            <img
+                              src={activity.mainPhotoUrl}
+                              alt={activity.name}
+                              className="w-full h-48 object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
+                            />
+                          </div>
+                        )}
+
                         <div className="flex justify-between items-start mb-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2">
@@ -672,6 +785,9 @@ export default function Activities({
                                 </span>
                               )}
                             </div>
+                            {('location' in activity) && activity.location && (
+                              <p className="text-sm text-gray-500 mt-1">📍 {activity.location}</p>
+                            )}
                             {activity.description && (
                               <p className="text-gray-600 mt-2">{activity.description}</p>
                             )}

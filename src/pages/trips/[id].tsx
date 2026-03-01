@@ -792,6 +792,7 @@ export default function TripDetails() {
                 destinations={destinations.filter(
                   (dest) => destinationFilter === "all" || dest.status === destinationFilter
                 )}
+                activities={activities}
               />
             )}
           </div>
