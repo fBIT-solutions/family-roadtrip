@@ -52,9 +52,10 @@ async function extractVideoThumbnail(videoUrl: string): Promise<string> {
       }
     };
     
-    video.onerror = (error) => {
+    video.onerror = () => {
       cleanup();
-      reject(new Error(`Could not load video: ${error || 'unknown error'}`));
+      const errorMsg = video.error?.message || "unknown error";
+      reject(new Error(`Could not load video: ${errorMsg}`));
     };
   });
 }
