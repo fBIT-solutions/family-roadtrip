@@ -100,6 +100,12 @@ export default function Destinations({
     return () => clearTimeout(timer);
   }, [newPlace, newCountry, fetchCoordinates]);
 
+  // Fetch destinations on page load
+  useEffect(() => {
+    setLoading(true);
+    fetchDestinations();
+  }, [fetchDestinations]);
+
   const handleAddDestination = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
