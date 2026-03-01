@@ -196,7 +196,7 @@ export default function ActivityDetail() {
 
   const handleVote = async () => {
     try {
-      await axios.post(`/api/activities/${id}/vote`);
+      await axios.put(`/api/activities/${id}?action=vote`, {});
       await fetchData();
     } catch (error) {
       console.error("Error voting on activity:", error);
