@@ -4,6 +4,7 @@ import { authOptions } from "../../auth/[...nextauth]";
 import * as destinationApi from "@/api/destinations";
 import * as tripsApi from "@/api/trips";
 import { canVoteOnItems } from "@/lib/auth-helpers";
+import { notifyVoteOnItem } from "@/lib/notifications";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -30,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
 
         // Check if user can vote (travelers only, not viewers)
-        if (!canVoteOnItems(trip, session.user.email)) {
+        if (!canVoteOnItems(trip, session?.user?.email || "")) {
           return res.status(403).json({
             error: "You do not have permission to vote",
             reason: "GUEST_NOT_TRAVELER",
@@ -41,14 +42,36 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         }
       }
 
+      // Check if this is a new vote (user wasn't already voting)
+      const wasAlreadyVoting = destination.votedBy.includes(session.user?.email || "");
+
       // Toggle vote
       const success = await destinationApi.voteForDestination(
         id as string,
-        session.user.email
+        session.user?.email || ""
       );
 
       if (!success) {
         return res.status(404).json({ error: "Destination not found" });
+      }
+
+      // Send notification if this is a new vote (not removal)
+      if (!wasAlreadyVoting && destination.addedBy && session.user?.email) {
+        const destinationUrl = `${process.env.NEXTAUTH_URL}/destinations/${id}`;
+        try {
+          await notifyVoteOnItem(
+            destination.addedBy,
+            destination.addedBy.split("@")[0], // Use email prefix as name
+            destination.name,
+            "destination",
+            "upvoted",
+            session.user.email,
+            destinationUrl
+          );
+        } catch (emailError) {
+          console.error("Failed to send vote notification email:", emailError);
+          // Don't fail the request if email fails to send
+        }
       }
 
       // Fetch and return updated destination

@@ -4,6 +4,7 @@ import { authOptions } from "../auth/authConfig";
 import { TripSchema } from "@/types/schema";
 import * as tripsApi from "@/api/trips";
 import { canViewTrip, canEditTrip, canManageTripMembers } from "@/lib/auth-helpers";
+import { notifyUserAddedToTrip, notifyUserRemovedFromTrip } from "@/lib/notifications";
 
 // Schema for PUT request - allows partial updates with date coercion
 const UpdateTripSchema = TripSchema.pick({
@@ -70,6 +71,105 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!trip) {
         return res.status(404).json({ error: "Trip not found" });
       }
+
+      // Send notifications for added/removed travelers
+      if (validatedData.people) {
+        const newTravelers = (validatedData.people || []).filter(
+          email => !exists.people.includes(email)
+        );
+        const removedTravelers = exists.people.filter(
+          email => !(validatedData.people || []).includes(email)
+        );
+
+        // Notify new travelers
+        if (newTravelers.length > 0) {
+          console.log(
+            `Sending notifications to new travelers: ${newTravelers.join(", ")}`
+          );
+          const tripUrl = `${process.env.NEXTAUTH_URL}/trips/${id}`;
+          for (const email of newTravelers) {
+            try {
+              await notifyUserAddedToTrip(
+                [email],
+                email.split("@")[0],
+                trip.name,
+                userEmail || "Unknown",
+                tripUrl
+              );
+            } catch (emailError) {
+              console.error(
+                `Failed to send added-to-trip notification to ${email}:`,
+                emailError
+              );
+            }
+          }
+        }
+
+        // Notify removed travelers
+        if (removedTravelers.length > 0) {
+          console.log(
+            `Sending notifications to removed travelers: ${removedTravelers.join(", ")}`
+          );
+          for (const email of removedTravelers) {
+            try {
+              await notifyUserRemovedFromTrip(email, email.split("@")[0], trip.name);
+            } catch (emailError) {
+              console.error(
+                `Failed to send removed-from-trip notification to ${email}:`,
+                emailError
+              );
+            }
+          }
+        }
+      }
+
+      // Send notifications for added/removed viewers
+      if (validatedData.viewers) {
+        const newViewers = (validatedData.viewers || []).filter(
+          email => !exists.viewers.includes(email)
+        );
+        const removedViewers = exists.viewers.filter(
+          email => !(validatedData.viewers || []).includes(email)
+        );
+
+        // Notify new viewers (they are also added to the trip)
+        if (newViewers.length > 0) {
+          console.log(`Sending notifications to new viewers: ${newViewers.join(", ")}`);
+          const tripUrl = `${process.env.NEXTAUTH_URL}/trips/${id}`;
+          for (const email of newViewers) {
+            try {
+              await notifyUserAddedToTrip(
+                [email],
+                email.split("@")[0],
+                trip.name,
+                userEmail || "Unknown",
+                tripUrl
+              );
+            } catch (emailError) {
+              console.error(
+                `Failed to send added-to-trip notification to ${email}:`,
+                emailError
+              );
+            }
+          }
+        }
+
+        // Notify removed viewers
+        if (removedViewers.length > 0) {
+          console.log(`Sending notifications to removed viewers: ${removedViewers.join(", ")}`);
+          for (const email of removedViewers) {
+            try {
+              await notifyUserRemovedFromTrip(email, email.split("@")[0], trip.name);
+            } catch (emailError) {
+              console.error(
+                `Failed to send removed-from-trip notification to ${email}:`,
+                emailError
+              );
+            }
+          }
+        }
+      }
+
       res.status(200).json(trip);
     } catch (error) {
       console.error("Error updating trip:", error);

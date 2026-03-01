@@ -5,6 +5,7 @@ import * as destinationApi from "@/api/destinations";
 import * as tripsApi from "@/api/trips";
 import * as itemReferencesApi from "@/api/itemReferences";
 import * as permissionsApi from "@/api/itemPermissions";
+import { notifyNewDestinationAdded } from "@/lib/notifications";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);
@@ -72,6 +73,50 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         userEmail,
         tripId
       );
+
+      // Send notification to trip members/contributors if this destination is added to a trip
+      if (tripId && userEmail) {
+        console.log(`[DESTINATION NOTIFICATION] tripId: ${tripId}, userEmail: ${userEmail}`);
+        const trip = await tripsApi.getTrip(tripId);
+        if (trip) {
+          console.log(`[DESTINATION NOTIFICATION] Trip found: "${trip.name}"`);
+          console.log(`[DESTINATION NOTIFICATION] trip.people: ${JSON.stringify(trip.people)}`);
+          console.log(`[DESTINATION NOTIFICATION] trip.viewers: ${JSON.stringify(trip.viewers)}`);
+          
+          // Get all trip members (people + viewers) except the person who added it
+          const recipients = [
+            ...trip.people.filter((p) => p !== userEmail),
+            ...trip.viewers.filter((v) => v !== userEmail),
+          ];
+
+          console.log(`[DESTINATION NOTIFICATION] Final recipients: ${JSON.stringify(recipients)}`);
+
+          if (recipients.length > 0) {
+            const destinationUrl = `${process.env.NEXTAUTH_URL}/destinations/${destination.id}`;
+            console.log(`[DESTINATION NOTIFICATION] Sending notifications to ${recipients.length} recipients`);
+            try {
+              await notifyNewDestinationAdded(
+                recipients,
+                destination.name,
+                trip.name,
+                userEmail,
+                destinationUrl
+              );
+              console.log(`[DESTINATION NOTIFICATION] Notifications sent successfully`);
+            } catch (emailError) {
+              console.error("Failed to send destination notification emails:", emailError);
+              // Don't fail the request if email fails to send
+            }
+          } else {
+            console.log(`[DESTINATION NOTIFICATION] No recipients found (creators don't receive notifications)`);
+          }
+        } else {
+          console.log(`[DESTINATION NOTIFICATION] Trip not found: ${tripId}`);
+        }
+      } else {
+        console.log(`[DESTINATION NOTIFICATION] Missing tripId or userEmail - tripId: ${tripId}, userEmail: ${userEmail}`);
+      }
+
       res.status(201).json(destination);
     } catch (error) {
       res.status(500).json({ error: "Failed to create destination" });

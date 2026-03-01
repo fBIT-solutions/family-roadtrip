@@ -5,6 +5,7 @@ import * as activitiesApi from "@/api/activities";
 import * as destinationsApi from "@/api/destinations";
 import * as tripsApi from "@/api/trips";
 import { canVoteOnItems } from "@/lib/auth-helpers";
+import { notifyVoteOnItem, notifyStatusChanged } from "@/lib/notifications";
 
 type ResponseData = any;
 
@@ -58,7 +59,30 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
           }
         }
 
+        // Check if this is a new vote (user wasn't already voting)
+        const wasAlreadyVoting = activity.votedBy?.includes(userEmail) || false;
+
         const updatedActivity = await activitiesApi.voteActivity(id as string, userEmail);
+
+        // Send notification if this is a new vote (not removal)
+        if (!wasAlreadyVoting && activity.addedBy && userEmail) {
+          const activityUrl = `${process.env.NEXTAUTH_URL}/activities/${id}`;
+          try {
+            await notifyVoteOnItem(
+              activity.addedBy,
+              activity.addedBy.split("@")[0], // Use email prefix as name
+              activity.name,
+              "activity",
+              "upvoted",
+              userEmail,
+              activityUrl
+            );
+          } catch (emailError) {
+            console.error("Failed to send vote notification email:", emailError);
+            // Don't fail the request if email fails to send
+          }
+        }
+
         return res.status(200).json(updatedActivity);
       } catch (error) {
         console.error("Error voting on activity:", error);
@@ -80,7 +104,46 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse<
         }
 
         const { status } = req.body;
+        const oldStatus = activity.status;
         const updated = await activitiesApi.updateActivityStatus(id as string, status as any);
+
+        // Send notification to trip members if status changed
+        if (oldStatus !== status && activity.destinationId && userEmail) {
+          try {
+            const destination = await destinationsApi.getDestination(activity.destinationId);
+            if (destination?.tripId) {
+              const trip = await tripsApi.getTrip(destination.tripId);
+              if (trip) {
+                // Get all trip members except the person who made the change
+                const recipients = [
+                  ...trip.people.filter((p) => p !== userEmail),
+                  ...trip.viewers.filter((v) => v !== userEmail),
+                ];
+
+                if (recipients.length > 0) {
+                  const activityUrl = `${process.env.NEXTAUTH_URL}/activities/${id}`;
+                  try {
+                    await notifyStatusChanged(
+                      recipients,
+                      activity.name,
+                      "activity",
+                      oldStatus,
+                      status,
+                      userEmail,
+                      activityUrl
+                    );
+                  } catch (emailError) {
+                    console.error("Failed to send status change notification email:", emailError);
+                    // Don't fail the request if email fails to send
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error("Error sending status change notification:", error);
+          }
+        }
+
         return res.status(200).json(updated);
       } catch (error) {
         console.error("Error updating activity status:", error);
