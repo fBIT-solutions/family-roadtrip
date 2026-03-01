@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "../auth/[...nextauth]";
+import { canViewTrip } from "@/lib/auth-helpers";
 import * as destinationApi from "@/api/destinations";
 import * as tripsApi from "@/api/trips";
 import * as permissionsApi from "@/api/itemPermissions";
@@ -34,21 +35,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(200).json(destination);
       }
 
-      // Check view permission for non-creators
+      // If destination is in a trip, check trip access (allows viewers)
+      if (destination.tripId) {
+        const trip = await tripsApi.getTrip(destination.tripId);
+        if (trip && canViewTrip(trip, userEmail)) {
+          return res.status(200).json(destination);
+        }
+        // If trip not found or no access, provide trip context in error
+        if (trip) {
+          return res.status(403).json({
+            error: "You do not have access to this destination",
+            tripId: trip.id,
+            tripName: trip.name,
+            tripOwnerEmail: trip.createdBy,
+          });
+        }
+      }
+
+      // For standalone destinations, check granular permissions
       const canView = await permissionsApi.canViewItem(id as string, userEmail);
       if (!canView) {
-        // If destination is in a trip, provide trip context in error
-        if (destination.tripId) {
-          const trip = await tripsApi.getTrip(destination.tripId);
-          if (trip) {
-            return res.status(403).json({
-              error: "You do not have access to this destination",
-              tripId: trip.id,
-              tripName: trip.name,
-              tripOwnerEmail: trip.createdBy,
-            });
-          }
-        }
         return res.status(403).json({ error: "You do not have access to this destination" });
       }
 

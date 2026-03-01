@@ -5,7 +5,7 @@ import Link from "next/link";
 import axios from "axios";
 import { Activity, Destination, FileMetadata, Trip } from "@/types/schema";
 import { FilesList } from "@/components/FilesList";
-import { isViewer } from "@/lib/auth-helpers";
+import { isViewer, filterFilesForUser } from "@/lib/auth-helpers";
 
 interface ActivityData {
   activity: Activity;
@@ -38,9 +38,15 @@ export default function ActivityDetail() {
   useEffect(() => {
     if (id && status === "authenticated") {
       fetchData();
-      fetchFiles();
     }
   }, [id, status]);
+
+  // Fetch files after data is loaded so we have trip info for filtering
+  useEffect(() => {
+    if (id && data) {
+      fetchFiles();
+    }
+  }, [id, data]);
 
   const fetchData = async () => {
     try {
@@ -92,9 +98,15 @@ export default function ActivityDetail() {
     if (!id) return;
     try {
       const response = await axios.get(`/api/files`);
-      const activityFiles = response.data.filter(
+      let activityFiles = response.data.filter(
         (file: FileMetadata) => file.activityId === id
       );
+      
+      // Filter files for viewers (only show pictures and videos)
+      if (data?.trip && session?.user?.email) {
+        activityFiles = filterFilesForUser(activityFiles, data.trip, session.user.email);
+      }
+      
       setFiles(activityFiles);
     } catch (error) {
       console.error("Error fetching files:", error);

@@ -7,6 +7,7 @@ import type { GetServerSideProps } from "next";
 import Link from "next/link";
 import axios from "axios";
 import { Activity, Destination, FileMetadata, Trip, ItemReference } from "@/types/schema";
+import { canViewTrip } from "@/lib/auth-helpers";
 import * as activitiesApi from "@/api/activities";
 import * as destinationApi from "@/api/destinations";
 import * as tripsApi from "@/api/trips";
@@ -830,6 +831,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     };
   }
 
+  const userEmail = session.user?.email || undefined;
   const { tripId } = context.query;
 
   // Skip data fetching if Cosmos DB env vars are not available (build time)
@@ -854,14 +856,20 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
 
     const [allActivities, destinationsList, allTrips] = await Promise.all(promises);
 
+    // Filter trips to only show those the user has access to
+    const accessibleTrips = (allTrips as Trip[]).filter((trip: Trip) =>
+      canViewTrip(trip, userEmail)
+    );
+
     let selectedTrip = null;
     let tripDestinations = destinationsList;
 
-    // If tripId is provided, filter to that trip
+    // If tripId is provided, filter to that trip (only if accessible)
     if (tripId && typeof tripId === "string") {
       try {
-        selectedTrip = allTrips.find((t: Trip) => t.id === tripId) || null;
-        if (selectedTrip) {
+        const trip = accessibleTrips.find((t: Trip) => t.id === tripId);
+        if (trip) {
+          selectedTrip = trip;
           // Filter destinations to only this trip's destinations
           tripDestinations = destinationsList.filter((d: Destination) => d.tripId === tripId);
         }
@@ -883,7 +891,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       updatedAt: dest.updatedAt?.toISOString?.() || dest.updatedAt,
     }));
 
-    const serializedTrips = allTrips.map((trip: Trip) => ({
+    const serializedTrips = accessibleTrips.map((trip: Trip) => ({
       ...trip,
       startDate: trip.startDate?.toISOString?.() || trip.startDate,
       endDate: trip.endDate?.toISOString?.() || trip.endDate,
