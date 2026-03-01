@@ -454,6 +454,13 @@ export default function TripSchedule() {
 
   const { trip } = tripData;
 
+  // Determine if user is a guest (viewer)
+  const userEmail = session?.user?.email;
+  const isGuest = !!(userEmail &&
+    trip.createdBy !== userEmail &&
+    !trip.people?.includes(userEmail) &&
+    trip.viewers?.includes(userEmail));
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -475,7 +482,13 @@ export default function TripSchedule() {
                   resetForm();
                   setShowAddModal(true);
                 }}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold"
+                disabled={isGuest}
+                className={`px-4 py-2 rounded font-semibold ${
+                  isGuest
+                    ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                }`}
+                title={isGuest ? "Guests cannot add events" : ""}
               >
                 + Add Event
               </button>
@@ -565,7 +578,13 @@ export default function TripSchedule() {
                 resetForm();
                 setShowAddModal(true);
               }}
-              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-semibold"
+              disabled={isGuest}
+              className={`px-6 py-2 rounded font-semibold ${
+                isGuest
+                  ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
+              title={isGuest ? "Guests cannot create events" : ""}
             >
               Create First Event
             </button>
@@ -635,23 +654,39 @@ export default function TripSchedule() {
                         <div className="flex gap-2 flex-col sm:flex-row">
                           <button
                             onClick={() => handleToggleComplete(event)}
+                            disabled={isGuest}
                             className={`px-3 py-1 rounded text-sm font-semibold transition ${
-                              event.completed
+                              isGuest
+                                ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                                : event.completed
                                 ? "bg-gray-400 text-white hover:bg-gray-500"
                                 : "bg-green-600 text-white hover:bg-green-700"
                             }`}
+                            title={isGuest ? "Guests cannot mark events" : ""}
                           >
                             {event.completed ? "✓ Done" : "Mark Done"}
                           </button>
                           <button
                             onClick={() => openEditModal(event)}
-                            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm font-semibold"
+                            disabled={isGuest}
+                            className={`px-3 py-1 rounded text-sm font-semibold ${
+                              isGuest
+                                ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                                : "bg-blue-600 text-white hover:bg-blue-700"
+                            }`}
+                            title={isGuest ? "Guests cannot edit events" : ""}
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleDeleteEvent(event.id)}
-                            className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 text-sm font-semibold"
+                            disabled={isGuest}
+                            className={`px-3 py-1 rounded text-sm font-semibold ${
+                              isGuest
+                                ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                                : "bg-red-600 text-white hover:bg-red-700"
+                            }`}
+                            title={isGuest ? "Guests cannot delete events" : ""}
                           >
                             Delete
                           </button>
@@ -704,23 +739,39 @@ export default function TripSchedule() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleToggleComplete(event)}
+                    disabled={isGuest}
                     className={`flex-1 px-2 py-1 rounded text-xs font-semibold transition ${
-                      event.completed
+                      isGuest
+                        ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                        : event.completed
                         ? "bg-gray-400 text-white hover:bg-gray-500"
                         : "bg-green-600 text-white hover:bg-green-700"
                     }`}
+                    title={isGuest ? "Guests cannot mark events" : ""}
                   >
                     {event.completed ? "✓" : "Done"}
                   </button>
                   <button
                     onClick={() => openEditModal(event)}
-                    className="flex-1 px-2 py-1 bg-blue-600 text-white rounded text-xs font-semibold hover:bg-blue-700"
+                    disabled={isGuest}
+                    className={`flex-1 px-2 py-1 rounded text-xs font-semibold ${
+                      isGuest
+                        ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                        : "bg-blue-600 text-white hover:bg-blue-700"
+                    }`}
+                    title={isGuest ? "Guests cannot edit events" : ""}
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => handleDeleteEvent(event.id)}
-                    className="flex-1 px-2 py-1 bg-red-600 text-white rounded text-xs font-semibold hover:bg-red-700"
+                    disabled={isGuest}
+                    className={`flex-1 px-2 py-1 rounded text-xs font-semibold ${
+                      isGuest
+                        ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                        : "bg-red-600 text-white hover:bg-red-700"
+                    }`}
+                    title={isGuest ? "Guests cannot delete events" : ""}
                   >
                     Delete
                   </button>
