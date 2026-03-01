@@ -51,7 +51,7 @@ export default function Activities({
 }) {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const { tripId: queryTripId } = router.query;
+  const { tripId: queryTripId, destinationId: queryDestinationId } = router.query;
   
   const [tripId, setTripId] = useState<string | null>(initialTrip?.id || null);
   const [trip, setTrip] = useState<Trip | null>(initialTrip);
@@ -61,6 +61,9 @@ export default function Activities({
   const [destinations, setDestinations] = useState<Destination[]>(initialDestinations);
   const [selectedDestination, setSelectedDestination] = useState<string>(
     initialDestinations?.[0]?.id || ""
+  );
+  const [activityDestinationFromUrl] = useState<string>(
+    typeof queryDestinationId === "string" ? queryDestinationId : ""
   );
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -72,7 +75,7 @@ export default function Activities({
   const [error, setError] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [files, setFiles] = useState<FileMetadata[]>([]);
-  const [activityDestination, setActivityDestination] = useState<string>(""); // For editing/creating activities
+  const [activityDestination, setActivityDestination] = useState<string>(activityDestinationFromUrl); // Prefilled from URL if navigating from destination
   const [showTravelerModal, setShowTravelerModal] = useState(false);
   const [failedTripId, setFailedTripId] = useState<string | null>(null);
   const [failedTripName, setFailedTripName] = useState<string | null>(null);
@@ -134,8 +137,8 @@ export default function Activities({
       return;
     }
 
-    if (!activityDestination && !tripId) {
-      setError("Please select either a trip or a destination");
+    if (!activityDestination) {
+      setError("Please select a destination");
       return;
     }
 
@@ -352,87 +355,54 @@ export default function Activities({
           </div>
         )}
 
-        {/* Trip Selector */}
-        {availableTrips.length > 0 && (
-          <div className="mb-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              📍 Select Trip
-            </label>
-            <div className="flex gap-2 flex-wrap">
-              <button
-                onClick={() => {
-                  setTripId(null);
-                  setTrip(null);
-                  setDestinations([]);
-                  setSelectedDestination("");
-                  router.push("/activities");
-                }}
-                className={`px-4 py-2 rounded-lg font-medium transition ${
-                  !tripId
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-                }`}
-              >
-                All Trips
-              </button>
-              {availableTrips.map((t) => (
-                <button
-                  key={t.id}
-                  onClick={() => {
-                    setTripId(t.id);
-                    setTrip(t);
-                    router.push(`/activities?tripId=${t.id}`);
-                  }}
-                  className={`px-4 py-2 rounded-lg font-medium transition ${
-                    tripId === t.id
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
-                  }`}
-                >
-                  {t.name}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Destination Filter */}
-        {destinations.length > 0 && (
-          <div className="mb-8">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Destination (optional - filter activities)
-            </label>
-            <select
-              value={selectedDestination}
-              onChange={(e) => setSelectedDestination(e.target.value)}
-              className="w-full max-w-md px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">-- All destinations --</option>
-              {destinations.map((dest) => (
-                <option key={dest.id} value={dest.id}>
-                  {dest.name} {dest.country ? `(${dest.country})` : ""}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
         {/* Activity Form */}
         <div className="bg-white rounded-lg shadow-md p-6 mb-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-4">
             {editingId ? "✏️ Edit Activity" : "➕ Add New Activity"}
           </h2>
+          <p className="text-sm text-gray-600 mb-4">
+            Activities require a destination but are independent of trips. You can add activities to any destination.
+          </p>
 
           {trip && (
             <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
               <p className="text-sm text-green-800">
-                <strong>Trip:</strong> {trip.name} • Adding activities to this trip
+                <strong>Current Trip:</strong> {trip.name}
               </p>
+            </div>
+          )}
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+              <p className="text-sm text-red-800">{error}</p>
             </div>
           )}
 
           <form onSubmit={handleAddActivity}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Destination * {activityDestinationFromUrl && <span className="text-sm text-green-600">(Prefilled from destination)</span>}
+                </label>
+                <select
+                  value={activityDestination}
+                  onChange={(e) => setActivityDestination(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">-- Select a destination --</option>
+                  {destinations.length > 0 ? (
+                    destinations.map((dest) => (
+                      <option key={dest.id} value={dest.id}>
+                        {dest.name} {dest.country ? `(${dest.country})` : ""}
+                      </option>
+                    ))
+                  ) : (
+                    <option disabled>No destinations available</option>
+                  )}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Activity Name *
@@ -465,28 +435,6 @@ export default function Activities({
                   <option value="relaxation">Relaxation</option>
                   <option value="adventure">Adventure</option>
                   <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Destination {trip ? "(optional)" : "(optional - required when no trip selected)"}
-                </label>
-                <select
-                  value={activityDestination}
-                  onChange={(e) => setActivityDestination(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">-- No destination --</option>
-                  {destinations.length > 0 ? (
-                    destinations.map((dest) => (
-                      <option key={dest.id} value={dest.id}>
-                        {dest.name} {dest.country ? `(${dest.country})` : ""}
-                      </option>
-                    ))
-                  ) : (
-                    <option disabled>No destinations in this trip</option>
-                  )}
                 </select>
               </div>
 
@@ -604,7 +552,102 @@ export default function Activities({
               />
             </div>
             )}
+        {/* Trip Selector */}
+        {availableTrips.length > 0 && (
+          <div className="mb-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              📍 Select Trip
+            </label>
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => {
+                  setTripId(null);
+                  setTrip(null);
+                  setDestinations([]);
+                  setSelectedDestination("");
+                  router.push("/activities");
+                }}
+                className={`px-4 py-2 rounded-lg font-medium transition ${
+                  !tripId
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                }`}
+              >
+                All Trips
+              </button>
+              {availableTrips.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => {
+                    setTripId(t.id);
+                    setTrip(t);
+                    router.push(`/activities?tripId=${t.id}`);
+                  }}
+                  className={`px-4 py-2 rounded-lg font-medium transition ${
+                    tripId === t.id
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-gray-700 border border-gray-300 hover:bg-gray-50"
+                  }`}
+                >
+                  {t.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
+        {/* Filters Section */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Filters</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {availableTrips.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Filter by Trip (optional)
+                </label>
+                <select
+                  value={tripId || ""}
+                  onChange={(e) => {
+                    const newTripId = e.target.value || null;
+                    setTripId(newTripId);
+                    if (newTripId) {
+                      router.push(`/activities?tripId=${newTripId}`);
+                    } else {
+                      router.push("/activities");
+                    }
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- All trips --</option>
+                  {availableTrips.map((t) => (
+                    <option key={t.id} value={t.id}>
+                      {t.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {destinations.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Filter by Destination (optional)
+                </label>
+                <select
+                  value={selectedDestination}
+                  onChange={(e) => setSelectedDestination(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">-- All destinations --</option>
+                  {destinations.map((dest) => (
+                    <option key={dest.id} value={dest.id}>
+                      {dest.name} {dest.country ? `(${dest.country})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+        </div>
             {/* Activities List */}
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-4">
@@ -832,7 +875,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   }
 
   const userEmail = session.user?.email || undefined;
-  const { tripId } = context.query;
+  const { tripId, destinationId } = context.query;
 
   // Skip data fetching if Cosmos DB env vars are not available (build time)
   if (!process.env.AZURE_COSMOS_ENDPOINT || !process.env.AZURE_COSMOS_KEY) {
@@ -862,7 +905,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     );
 
     let selectedTrip = null;
-    let tripDestinations = destinationsList;
+    let displayDestinations = destinationsList;
 
     // If tripId is provided, filter to that trip (only if accessible)
     if (tripId && typeof tripId === "string") {
@@ -871,11 +914,15 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
         if (trip) {
           selectedTrip = trip;
           // Filter destinations to only this trip's destinations
-          tripDestinations = destinationsList.filter((d: Destination) => d.tripId === tripId);
+          displayDestinations = destinationsList.filter((d: Destination) => d.tripId === tripId);
         }
       } catch (err) {
         console.error("Error fetching trip:", err);
       }
+    } else {
+      // If no tripId (whether or not destinationId exists), show all destinations
+      // This allows users to create activities for any destination without a trip
+      displayDestinations = destinationsList;
     }
 
     // Serialize dates to ISO strings for JSON
@@ -885,7 +932,7 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
       updatedAt: activity.updatedAt?.toISOString?.() || activity.updatedAt,
     }));
 
-    const serializedDestinations = tripDestinations.map((dest: Destination) => ({
+    const serializedDestinations = displayDestinations.map((dest: Destination) => ({
       ...dest,
       createdAt: dest.createdAt?.toISOString?.() || dest.createdAt,
       updatedAt: dest.updatedAt?.toISOString?.() || dest.updatedAt,
