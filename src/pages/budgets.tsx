@@ -7,8 +7,10 @@ import type { GetServerSideProps } from "next";
 import Link from "next/link";
 import axios from "axios";
 import { TripBudget, Destination } from "@/types/schema";
+import { canViewTripBudget } from "@/lib/auth-helpers";
 import * as budgetApi from "@/api/budgets";
 import * as destinationApi from "@/api/destinations";
+import * as tripsApi from "@/api/trips";
 
 const categoryColors: Record<string, string> = {
   accommodation: "bg-blue-100 text-blue-800",
@@ -664,6 +666,8 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
     };
   }
 
+  const userEmail = session.user?.email || undefined;
+
   // Skip data fetching if Cosmos DB env vars are not available (build time)
   if (!process.env.AZURE_COSMOS_ENDPOINT || !process.env.AZURE_COSMOS_KEY) {
     return {
@@ -677,6 +681,16 @@ export const getServerSideProps: GetServerSideProps = async (context) => {
   try {
     // Get tripId from query params if available
     const tripId = context.query.tripId as string | undefined;
+
+    // If tripId is provided, check if user has permission to view the budget
+    if (tripId) {
+      const trip = await tripsApi.getTrip(tripId);
+      if (!trip || !canViewTripBudget(trip, userEmail)) {
+        return {
+          notFound: true,
+        };
+      }
+    }
 
     const [tripBudget, allDestinations] = await Promise.all([
       budgetApi.getTripBudget(tripId),

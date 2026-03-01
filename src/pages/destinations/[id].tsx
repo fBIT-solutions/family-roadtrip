@@ -6,7 +6,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { Destination, Activity, FileMetadata, Trip } from "@/types/schema";
 import { FilesList } from "@/components/FilesList";
-import { isViewer } from "@/lib/auth-helpers";
+import { isViewer, canViewTripBudget } from "@/lib/auth-helpers";
 
 interface DestinationData {
   destination: Destination;
@@ -610,10 +610,11 @@ export default function DestinationDetail() {
           </div>
 
           {/* Right Column - Budget */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Budget</h2>
-            
-            {formData.estimatedBudget ? (
+          {data?.trip && canViewTripBudget(data.trip, session?.user?.email) ? (
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">Budget</h2>
+              
+              {formData.estimatedBudget ? (
               <div className="space-y-6">
                 <div className="p-4 bg-blue-50 rounded-lg">
                   <p className="text-sm text-gray-600">Estimated Budget</p>
@@ -654,20 +655,24 @@ export default function DestinationDetail() {
                       </div>
                     )}
 
-                    <Link href={`/budgets?tripId=${data.destination.tripId}&destinationId=${id}`}>
-                      <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                        Manage Budget
-                      </button>
-                    </Link>
+                    {data?.trip && canViewTripBudget(data.trip, session?.user?.email) && (
+                      <Link href={`/budgets?tripId=${data.destination.tripId}&destinationId=${id}`}>
+                        <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                          Manage Budget
+                        </button>
+                      </Link>
+                    )}
                   </>
                 ) : (
                   <div className="p-4 bg-gray-50 rounded-lg text-center">
                     <p className="text-gray-600 mb-4">No budget tracking started yet</p>
-                    <Link href={`/budgets?tripId=${data.destination.tripId}&destinationId=${id}`}>
-                      <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                        Start Tracking
-                      </button>
-                    </Link>
+                    {data?.trip && canViewTripBudget(data.trip, session?.user?.email) && (
+                      <Link href={`/budgets?tripId=${data.destination.tripId}&destinationId=${id}`}>
+                        <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                          Start Tracking
+                        </button>
+                      </Link>
+                    )}
                   </div>
                 )}
               </div>
@@ -676,7 +681,8 @@ export default function DestinationDetail() {
                 <p className="text-gray-600">Set an estimated budget above to track expenses</p>
               </div>
             )}
-          </div>
+            </div>
+          ) : null}
         </div>
 
         {/* Files Section */}
