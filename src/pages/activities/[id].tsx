@@ -213,7 +213,13 @@ export default function ActivityDetail() {
               <div className="flex gap-4 mt-4">
                 <button
                   onClick={handleVote}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
+                  disabled={data?.trip && isViewer(data.trip, session?.user?.email || "")}
+                  className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+                    data?.trip && isViewer(data.trip, session?.user?.email || "")
+                      ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                      : "bg-green-600 text-white hover:bg-green-700"
+                  }`}
+                  title={data?.trip && isViewer(data.trip, session?.user?.email || "") ? "Guests cannot vote" : ""}
                 >
                   👍 Vote ({activity.votes})
                 </button>

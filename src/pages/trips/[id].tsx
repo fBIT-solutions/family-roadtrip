@@ -518,7 +518,14 @@ export default function TripDetails() {
             )}
             <button 
               onClick={() => setShowMediaModal(true)}
-              className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-pink-600 text-white rounded hover:bg-pink-700">
+              disabled={userRole === "reader"}
+              className={`px-2 py-2 text-xs sm:text-sm sm:px-4 rounded ${
+                userRole === "reader"
+                  ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                  : "bg-pink-600 text-white hover:bg-pink-700"
+              }`}
+              title={userRole === "reader" ? "Guests cannot upload media" : ""}
+            >
               📸 Media
             </button>
             {userRole !== "reader" && (
@@ -529,7 +536,15 @@ export default function TripDetails() {
               </button>
             )}
             <Link href={`/trips/${trip.id}/destinations`} className="col-span-1">
-              <button className="w-full px-2 py-2 text-xs sm:text-sm sm:px-4 bg-blue-600 text-white rounded hover:bg-blue-700">
+              <button 
+                disabled={userRole === "reader"}
+                className={`w-full px-2 py-2 text-xs sm:text-sm sm:px-4 rounded ${
+                  userRole === "reader"
+                    ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                }`}
+                title={userRole === "reader" ? "Guests cannot add destinations" : ""}
+              >
                 🌍 Destinations
               </button>
             </Link>
@@ -538,7 +553,14 @@ export default function TripDetails() {
                 setSelectedActivityDestination(destinations.length > 0 ? destinations[0].id : "");
                 setShowAddActivityModal(true);
               }}
-              className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-purple-600 text-white rounded hover:bg-purple-700">
+              disabled={userRole === "reader"}
+              className={`px-2 py-2 text-xs sm:text-sm sm:px-4 rounded ${
+                userRole === "reader"
+                  ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                  : "bg-purple-600 text-white hover:bg-purple-700"
+              }`}
+              title={userRole === "reader" ? "Guests cannot add activities" : ""}
+            >
               ➕ Activity
             </button>
           </div>
@@ -688,7 +710,7 @@ export default function TripDetails() {
           <h3 className="text-2xl font-bold text-gray-800 mb-6">📸 TRIP MEDIA</h3>
           <MediaGallery 
             files={tripFiles} 
-            onUploadClick={() => setShowMediaModal(true)}
+            onUploadClick={userRole === "reader" ? undefined : () => setShowMediaModal(true)}
           />
         </div>
 
@@ -743,7 +765,7 @@ export default function TripDetails() {
           </div>
           <FilesList 
             files={documentFilter === "all" ? tripFiles : tripFiles.filter(f => f.category === documentFilter)}
-            onDelete={handleDeleteFile} 
+            onDelete={userRole === "reader" ? undefined : handleDeleteFile} 
             isLoading={deletingFile} 
           />
         </div>

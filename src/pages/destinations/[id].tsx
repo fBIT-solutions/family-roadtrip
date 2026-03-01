@@ -332,12 +332,18 @@ export default function DestinationDetail() {
               <h1 className="text-4xl font-bold text-gray-800">{formData.name}</h1>
               <p className="text-gray-600 text-lg mt-2">{formData.place}, {formData.country}</p>
               <div className="flex gap-4 mt-4">
-                <button
-                  onClick={handleVote}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"
-                >
-                  👍 Vote ({destination.votes})
-                </button>
+              <button
+                onClick={handleVote}
+                disabled={data?.trip ? isViewer(data.trip, session?.user?.email || "") : false}
+                className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
+                  data?.trip && isViewer(data.trip, session?.user?.email || "")
+                    ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                    : "bg-green-600 text-white hover:bg-green-700"
+                }`}
+                title={data?.trip && isViewer(data.trip, session?.user?.email || "") ? "Guests cannot vote" : ""}
+              >
+                👍 Vote ({destination.votes})
+              </button>
               </div>
             </div>
             {isOwner && (
@@ -573,7 +579,15 @@ export default function DestinationDetail() {
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-800">Linked Activities</h2>
               <Link href={`/activities?destinationId=${id}`}>
-                <button className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700">
+                <button 
+                  disabled={data?.trip ? isViewer(data.trip, session?.user?.email || "") : false}
+                  className={`px-3 py-1 rounded text-sm ${
+                    data?.trip && isViewer(data.trip, session?.user?.email || "")
+                      ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                      : "bg-blue-600 text-white hover:bg-blue-700"
+                  }`}
+                  title={data?.trip && isViewer(data.trip, session?.user?.email || "") ? "Guests cannot add activities" : ""}
+                >
                   + Add Activity
                 </button>
               </Link>
