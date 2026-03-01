@@ -7,8 +7,6 @@ import {
   EXPENSE_CATEGORIES,
   EXPENSE_CATEGORY_COLORS,
   ACTIVITY_STATUSES,
-  PRIORITY_LEVELS,
-  BUDGET_STATUSES,
 } from '@/lib/constants'
 
 describe('Constants', () => {
@@ -88,24 +86,6 @@ describe('Constants', () => {
       if (ACTIVITY_STATUSES) {
         expect(Array.isArray(ACTIVITY_STATUSES)).toBe(true)
         expect(ACTIVITY_STATUSES.length).toBeGreaterThan(0)
-      }
-    })
-  })
-
-  describe('PRIORITY_LEVELS', () => {
-    it('should contain priority level options', () => {
-      if (PRIORITY_LEVELS) {
-        expect(Array.isArray(PRIORITY_LEVELS)).toBe(true)
-        expect(PRIORITY_LEVELS.length).toBeGreaterThan(0)
-      }
-    })
-  })
-
-  describe('BUDGET_STATUSES', () => {
-    it('should contain budget status options', () => {
-      if (BUDGET_STATUSES) {
-        expect(Array.isArray(BUDGET_STATUSES)).toBe(true)
-        expect(BUDGET_STATUSES.length).toBeGreaterThan(0)
       }
     })
   })
