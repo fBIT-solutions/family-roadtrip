@@ -1,0 +1,30 @@
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+version: 2
+updates:
+  - package-ecosystem: "devcontainers"
+    directory: "/"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "daily"
+
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    ignore:
+      - dependency-name: "react"
+        versions:
+          - "19.2.4"
+      - dependency-name: "react-dom"
+        versions:
+          - "19.2.4"
+      - dependency-name: "react-leaflet"
+        versions:
+          - "^4.2.1"
+      - dependency-name: "resend"
+        versions:
+          - "^6.9.3"
