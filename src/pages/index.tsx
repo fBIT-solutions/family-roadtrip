@@ -328,46 +328,73 @@ export default function Home() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {trips.map((trip) => (
-                <div
-                  key={trip.id}
-                  onClick={() => router.push(`/trips/${trip.id}`)}
-                  className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer border-l-4 border-blue-500"
-                >
-                  <div className="flex justify-between items-start mb-3">
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-800">{trip.name}</h3>
-                      <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded capitalize">
-                        {trip.goal}
+              {trips.map((trip) => {
+                // Determine user's role in this trip
+                let userRole = "guest";
+                if (trip.createdBy === session?.user?.email) {
+                  userRole = "owner";
+                } else if (trip.people?.includes(session?.user?.email || "")) {
+                  userRole = "contributor";
+                } else if (trip.viewers?.includes(session?.user?.email || "")) {
+                  userRole = "guest";
+                }
+
+                const roleConfig: Record<string, { label: string; color: string; icon: string }> = {
+                  owner: { label: "Owner", color: "bg-purple-100 text-purple-800", icon: "👑" },
+                  contributor: { label: "Contributor", color: "bg-green-100 text-green-800", icon: "✏️" },
+                  guest: { label: "Guest", color: "bg-gray-100 text-gray-800", icon: "👁️" },
+                };
+
+                const role = roleConfig[userRole];
+
+                return (
+                  <div
+                    key={trip.id}
+                    onClick={() => router.push(`/trips/${trip.id}`)}
+                    className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer border-l-4 border-blue-500"
+                  >
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-800">{trip.name}</h3>
+                        <div className="flex gap-2 mt-2">
+                          <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded capitalize">
+                            {trip.goal}
+                          </span>
+                          <span className={`text-sm px-2 py-1 rounded font-semibold ${role.color}`}>
+                            {role.icon} {role.label}
+                          </span>
+                        </div>
+                      </div>
+                      <span className={`px-2 py-1 text-xs rounded font-semibold ${
+                        trip.status === "planning" ? "bg-yellow-100 text-yellow-800" :
+                        trip.status === "active" ? "bg-green-100 text-green-800" :
+                        trip.status === "completed" ? "bg-blue-100 text-blue-800" :
+                        "bg-red-100 text-red-800"
+                      }`}>
+                        {trip.status}
                       </span>
                     </div>
-                    <span className={`px-2 py-1 text-xs rounded font-semibold ${
-                      trip.status === "planning" ? "bg-yellow-100 text-yellow-800" :
-                      trip.status === "active" ? "bg-green-100 text-green-800" :
-                      trip.status === "completed" ? "bg-blue-100 text-blue-800" :
-                      "bg-red-100 text-red-800"
-                    }`}>
-                      {trip.status}
-                    </span>
+
+                    <p className="text-gray-600 text-sm mb-3">{trip.description}</p>
+
+                    <div className="space-y-2 text-sm text-gray-700 mb-4">
+                      <div>📅 {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}</div>
+                      <div>⏱️  {trip.days} days</div>
+                      <div>👥 {trip.people.length} person{trip.people.length !== 1 ? "s" : ""} {trip.hasPet && "🐾"}</div>
+                      <div>💰 {trip.currency} {trip.totalBudget.toLocaleString()}</div>
+                    </div>
+
+                    {userRole === "owner" && (
+                      <button
+                        onClick={(e) => handleDeleteTrip(trip.id, e)}
+                        className="w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition"
+                      >
+                        Delete Trip
+                      </button>
+                    )}
                   </div>
-
-                  <p className="text-gray-600 text-sm mb-3">{trip.description}</p>
-
-                  <div className="space-y-2 text-sm text-gray-700 mb-4">
-                    <div>📅 {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}</div>
-                    <div>⏱️  {trip.days} days</div>
-                    <div>👥 {trip.people.length} person{trip.people.length !== 1 ? "s" : ""} {trip.hasPet && "🐾"}</div>
-                    <div>💰 {trip.currency} {trip.totalBudget.toLocaleString()}</div>
-                  </div>
-
-                  <button
-                    onClick={(e) => handleDeleteTrip(trip.id, e)}
-                    className="w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition"
-                  >
-                    Delete Trip
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
