@@ -12,24 +12,50 @@ interface MediaGalleryProps {
 async function extractVideoThumbnail(videoUrl: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const video = document.createElement("video");
+    video.preload = "metadata";
     video.src = videoUrl;
     video.crossOrigin = "anonymous";
+    
+    // Set a timeout to prevent hanging if video never loads
+    const timeoutId = setTimeout(() => {
+      reject(new Error("Video loading timed out"));
+    }, 5000);
+    
+    const cleanup = () => clearTimeout(timeoutId);
+    
     video.onloadedmetadata = () => {
-      video.currentTime = 1; // Get frame at 1 second
-    };
-    video.onseeked = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.drawImage(video, 0, 0);
-        resolve(canvas.toDataURL("image/jpeg"));
-      } else {
-        reject(new Error("Could not get canvas context"));
+      try {
+        video.currentTime = Math.min(1, video.duration * 0.1); // Get early frame
+      } catch (err) {
+        cleanup();
+        reject(new Error("Could not seek video"));
       }
     };
-    video.onerror = () => reject(new Error("Could not load video"));
+    
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0);
+          cleanup();
+          resolve(canvas.toDataURL("image/jpeg"));
+        } else {
+          cleanup();
+          reject(new Error("Could not get canvas context"));
+        }
+      } catch (err) {
+        cleanup();
+        reject(err);
+      }
+    };
+    
+    video.onerror = (error) => {
+      cleanup();
+      reject(new Error(`Could not load video: ${error || 'unknown error'}`));
+    };
   });
 }
 
