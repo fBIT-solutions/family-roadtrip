@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import axios from "axios";
 import Link from "next/link";
 import { Trip, Destination } from "@/types/schema";
+import { DestinationMap } from "@/components/DestinationMap";
 
 interface TripDestinationsData {
   trip: Trip;
@@ -28,6 +29,7 @@ export default function TripDestinations() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [showRecommendations, setShowRecommendations] = useState(false);
+  const [viewMode, setViewMode] = useState<"list" | "map">("list");
   const [formData, setFormData] = useState({
     name: "",
     place: "",
@@ -324,30 +326,60 @@ export default function TripDestinations() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex justify-between items-center mb-8">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
           <h2 className="text-2xl font-bold text-gray-800">
             Destinations ({destinations.length})
           </h2>
-          <button
-            onClick={handleOpenAddModal}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
-          >
-            + Add Destination
-          </button>
-        </div>
-
-        {destinations.length === 0 ? (
-          <div className="bg-white p-12 rounded-lg shadow text-center">
-            <p className="text-gray-600 mb-4">No destinations added yet. Add your first destination to get started!</p>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => setViewMode("list")}
+              className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg ${
+                viewMode === "list"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+              }`}
+            >
+              📋 List
+            </button>
+            <button
+              onClick={() => setViewMode("map")}
+              className={`flex-1 sm:flex-initial px-4 py-2 rounded-lg ${
+                viewMode === "map"
+                  ? "bg-blue-600 text-white"
+                  : "bg-gray-200 text-gray-800 hover:bg-gray-300"
+              }`}
+            >
+              🗺️ Map
+            </button>
             <button
               onClick={handleOpenAddModal}
-              className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="flex-1 sm:flex-initial px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
             >
-              Add First Destination
+              + Add
             </button>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        </div>
+
+        {viewMode === "map" && !loading && destinations.length > 0 && (
+          <div className="bg-white p-6 rounded-lg shadow mb-8">
+            <DestinationMap destinations={destinations as any} />
+          </div>
+        )}
+
+        {viewMode === "list" && (
+          <>
+            {destinations.length === 0 ? (
+              <div className="bg-white p-12 rounded-lg shadow text-center">
+                <p className="text-gray-600 mb-4">No destinations added yet. Add your first destination to get started!</p>
+                <button
+                  onClick={handleOpenAddModal}
+                  className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                >
+                  Add First Destination
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {destinations.map((dest) => (
               <div
                 key={dest.id}
@@ -406,7 +438,9 @@ export default function TripDestinations() {
                 </div>
               </div>
             ))}
-          </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Available Destinations Section */}
