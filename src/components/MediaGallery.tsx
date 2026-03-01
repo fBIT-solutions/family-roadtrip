@@ -18,6 +18,7 @@ async function extractVideoThumbnail(videoUrl: string): Promise<string> {
     
     // Set a timeout to prevent hanging if video never loads
     const timeoutId = setTimeout(() => {
+      cleanup();
       reject(new Error("Video loading timed out"));
     }, 5000);
     
@@ -54,8 +55,9 @@ async function extractVideoThumbnail(videoUrl: string): Promise<string> {
     
     video.onerror = () => {
       cleanup();
-      const errorMsg = video.error?.message || "unknown error";
-      reject(new Error(`Could not load video: ${errorMsg}`));
+      // Silently skip thumbnail extraction for unsupported formats
+      // The video player will still work, just without a custom thumbnail
+      resolve("");
     };
   });
 }
