@@ -276,6 +276,66 @@ export async function deleteDestination(id: string): Promise<boolean> {
   }
 }
 
+/**
+ * Get all destinations for a trip, including:
+ * - Destinations directly linked (tripId = id)
+ * - User-specific item references (for public destinations)
+ * Returns normalized Destination-like objects with metadata
+ */
+export async function getDestinationsForTrip(
+  tripId: string,
+  userId?: string
+): Promise<(Destination & { isReference?: boolean; referenceId?: string; originalDestinationId?: string })[]> {
+  try {
+    // Get directly linked destinations
+    const directDestinations = await getDestinationsByTrip(tripId);
+
+    // Get item references if userId provided
+    let references: any[] = [];
+    if (userId) {
+      const itemReferencesApi = await import("./itemReferences");
+      const itemRefs = await itemReferencesApi.getItemReferencesByUserAndTrip(userId, tripId);
+      references = itemRefs.filter((ref) => ref.type === "destination");
+    }
+
+    // Combine and normalize: convert references to Destination-like format
+    const combined = [
+      ...directDestinations.map((d) => ({ ...d, isReference: false })),
+      ...references.map((ref) => ({
+        // Convert ItemReference to Destination-like object
+        id: ref.id,
+        name: ref.name,
+        place: ref.place,
+        country: ref.country,
+        description: ref.description,
+        mainPhotoUrl: ref.mainPhotoUrl,
+        latitude: ref.latitude,
+        longitude: ref.longitude,
+        estimatedBudget: ref.estimatedBudget || 0,
+        currency: "EUR", // Default, could be stored in reference
+        status: ref.status || "proposed",
+        votes: 0,
+        votedBy: [],
+        addedBy: ref.originalCreatorId,
+        tripId: tripId,
+        urls: [],
+        public: false, // References are user-specific
+        createdAt: ref.createdAt,
+        updatedAt: ref.updatedAt,
+        // Mark as reference for UI differentiation
+        isReference: true,
+        referenceId: ref.id,
+        originalDestinationId: ref.originalItemId,
+      })),
+    ];
+
+    return combined;
+  } catch (error) {
+    console.error("Error fetching destinations for trip:", error);
+    return [];
+  }
+}
+
 export async function getDestinationsContainer() {
   return containers.destinations;
 }

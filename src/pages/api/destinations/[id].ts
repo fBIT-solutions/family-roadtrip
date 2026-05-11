@@ -5,6 +5,7 @@ import { canViewTrip } from "@/lib/auth-helpers";
 import * as destinationApi from "@/api/destinations";
 import * as tripsApi from "@/api/trips";
 import * as permissionsApi from "@/api/itemPermissions";
+import * as itemReferencesApi from "@/api/itemReferences";
 import { notifyStatusChanged } from "@/lib/notifications";
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -76,7 +77,62 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(404).json({ error: "Destination not found" });
       }
 
-      // Creators can always edit their own destinations
+      // Special case: Allow users to link a public destination to their trip
+      // This creates an ItemReference instead of modifying the original destination
+      const isLinkingOperation = Object.keys(req.body).length === 1 && req.body.tripId;
+      if (isLinkingOperation && destination.public) {
+        // Verify the user has access to the trip they're linking to
+        const newTripId = req.body.tripId;
+        const trip = await tripsApi.getTrip(newTripId);
+        if (!trip) {
+          return res.status(404).json({ error: "Trip not found" });
+        }
+
+        // Check if user is a traveler in this trip (not viewer-only)
+        const isTraveler = trip.people.includes(userEmail);
+        if (!isTraveler) {
+          return res.status(403).json({ error: "You must be a traveler in the trip to add destinations" });
+        }
+
+        // Check if already linked
+        const existingReferences = await itemReferencesApi.getItemReferencesByUserAndTrip(userEmail, newTripId);
+        const alreadyLinked = existingReferences.some(ref => ref.type === "destination" && ref.originalItemId === id);
+        if (alreadyLinked) {
+          return res.status(400).json({ error: "This destination is already added to your trip" });
+        }
+
+        // Create ItemReference for this user
+        try {
+          const reference = await itemReferencesApi.createDestinationReference(
+            id as string,
+            destination.addedBy,
+            userEmail,
+            {
+              name: destination.name,
+              description: destination.description,
+              place: destination.place,
+              country: destination.country,
+              latitude: destination.latitude,
+              longitude: destination.longitude,
+              mainPhotoUrl: destination.mainPhotoUrl,
+            },
+            newTripId
+          );
+
+          // Return the reference as the destination for the frontend
+          // Frontend needs to understand this is a reference now
+          return res.status(200).json({
+            ...reference,
+            isReference: true,
+            originalDestinationId: id,
+          });
+        } catch (refError) {
+          console.error("Error creating destination reference:", refError);
+          return res.status(500).json({ error: "Failed to add destination to trip" });
+        }
+      }
+
+      // For non-public destinations or full edits, require full edit permission
       let canEdit = destination.addedBy === userEmail;
       if (!canEdit) {
         // Check edit permission for non-creators

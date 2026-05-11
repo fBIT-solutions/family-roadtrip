@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === "GET") {
     try {
-      const tripData = await tripsApi.getTripWithStats(id);
+      const tripData = await tripsApi.getTripWithStats(id, userEmail);
       if (!tripData) {
         return res.status(404).json({ error: "Trip not found" });
       }
