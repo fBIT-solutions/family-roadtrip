@@ -8,6 +8,7 @@ import Link from "next/link";
 import axios from "axios";
 import { Activity, Destination, FileMetadata, Trip, ItemReference } from "@/types/schema";
 import { ACTIVITY_CATEGORY_COLORS, ACTIVITY_STATUS_COLORS, getActivityCategoryColor, getActivityStatusColor } from "@/lib/constants";
+import { useCoordinateFetcher } from "@/hooks/useCoordinateFetcher";
 import { canViewTrip } from "@/lib/auth-helpers";
 import * as activitiesApi from "@/api/activities";
 import * as destinationApi from "@/api/destinations";
@@ -90,39 +91,10 @@ export default function Activities({
   }, [selectedDestination, tripId]);
 
   // Fetch coordinates from API when location is provided
-  const fetchCoordinates = useCallback(async (locationStr: string) => {
-    if (!locationStr) {
-      setLatitude(null);
-      setLongitude(null);
-      return;
-    }
-
-    try {
-      const response = await axios.get("/api/coordinates", {
-        params: { place: locationStr },
-      });
-
-      if (response.data.latitude && response.data.longitude) {
-        setLatitude(response.data.latitude);
-        setLongitude(response.data.longitude);
-        console.log(`Coordinates fetched: ${response.data.latitude}, ${response.data.longitude}`);
-      }
-    } catch (error) {
-      console.error("Error fetching coordinates:", error);
-      // Silently fail - user can still add activity without coordinates
-    }
-  }, []);
-
-  // Auto-fetch coordinates when location changes (with debounce)
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (location) {
-        fetchCoordinates(location);
-      }
-    }, 500); // Debounce for 500ms
-
-    return () => clearTimeout(timer);
-  }, [location, fetchCoordinates]);
+  const fetchCoordinates = useCoordinateFetcher((lat, lon) => {
+    setLatitude(lat);
+    setLongitude(lon);
+  });
 
   useEffect(() => {
     fetchActivities();
@@ -166,14 +138,25 @@ export default function Activities({
     setLoading(true);
 
     try {
+      // Fetch coordinates if location provided
+      let finalLatitude = latitude;
+      let finalLongitude = longitude;
+      if (location && !latitude) {
+        const coords = await fetchCoordinates(location);
+        if (coords) {
+          finalLatitude = coords.latitude;
+          finalLongitude = coords.longitude;
+        }
+      }
+
       if (editingId) {
         // Update existing activity - include destination if provided
         await axios.put(`/api/activities/${editingId}`, {
           name,
           description: description || undefined,
           location: location || undefined,
-          latitude: latitude || undefined,
-          longitude: longitude || undefined,
+          latitude: finalLatitude || undefined,
+          longitude: finalLongitude || undefined,
           mainPhotoUrl: mainPhotoUrl || undefined,
           category,
           url: url || undefined,
@@ -191,8 +174,8 @@ export default function Activities({
           tripId: tripId || undefined,
           description: description || undefined,
           location: location || undefined,
-          latitude: latitude || undefined,
-          longitude: longitude || undefined,
+          latitude: finalLatitude || undefined,
+          longitude: finalLongitude || undefined,
           mainPhotoUrl: mainPhotoUrl || undefined,
           category,
           url: url || undefined,
