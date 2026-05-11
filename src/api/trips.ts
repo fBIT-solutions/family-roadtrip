@@ -168,18 +168,27 @@ export async function deleteTrip(id: string): Promise<boolean> {
   }
 }
 
-export async function getTripWithStats(id: string) {
+export async function getTripWithStats(id: string, userEmail?: string) {
   try {
     const trip = await getTrip(id);
     if (!trip) return null;
 
-    // Get destinations for this trip
-    const { resources: destinations } = await containers.destinations.items
-      .query({
-        query: "SELECT * FROM c WHERE c.tripId = @tripId",
-        parameters: [{ name: "@tripId", value: id }],
-      })
-      .fetchAll();
+    // Get destinations for this trip (both direct and references)
+    let destinations: any[] = [];
+    if (userEmail) {
+      // Import at runtime to avoid circular dependency
+      const destinationApi = await import("./destinations");
+      destinations = await destinationApi.getDestinationsForTrip(id, userEmail);
+    } else {
+      // Fallback: get only direct destinations if no user email
+      const { resources } = await containers.destinations.items
+        .query({
+          query: "SELECT * FROM c WHERE c.tripId = @tripId",
+          parameters: [{ name: "@tripId", value: id }],
+        })
+        .fetchAll();
+      destinations = resources || [];
+    }
 
     // Get expenses for this trip
     const { resources: expenses } = await containers.expenses.items

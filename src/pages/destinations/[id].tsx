@@ -37,7 +37,7 @@ export default function DestinationDetail() {
   const [denialReason, setDenialReason] = useState<{ tripId?: string; tripName?: string; tripOwnerEmail?: string } | null>(null);
   const [showTravelerModal, setShowTravelerModal] = useState(false);
   const [requestingTraveler, setRequestingTraveler] = useState(false);
-  
+
   // Edit form state
   const [formData, setFormData] = useState({
     name: "",
@@ -80,59 +80,129 @@ export default function DestinationDetail() {
     try {
       setAccessDenied(false);
       setDenialReason(null);
-      const [destResponse, activitiesResponse] = await Promise.all([
-        axios.get(`/api/destinations/${id}`),
-        axios.get(`/api/activities`).catch((error) => {
-          // If activities endpoint fails, just return empty activities
-          if (error?.response?.status === 403) {
-            console.error("Access denied to activities:", error);
-            return { data: { activities: [] } };
+
+      try {
+        // First try direct destination endpoint
+        const [destResponse, activitiesResponse] = await Promise.all([
+          axios.get(`/api/destinations/${id}`),
+          axios.get(`/api/activities`).catch((error) => {
+            // If activities endpoint fails, just return empty activities
+            if (error?.response?.status === 403) {
+              console.error("Access denied to activities:", error);
+              return { data: { activities: [] } };
+            }
+            throw error;
+          }),
+        ]);
+
+        const destination = destResponse.data;
+        // Filter activities by destinationId
+        const linkedActivities = (activitiesResponse.data.activities || activitiesResponse.data).filter(
+          (activity: Activity) => activity.destinationId === id
+        );
+
+        // Fetch trip if destination is linked to a trip
+        let trip: Trip | undefined;
+        if (destination.tripId) {
+          try {
+            const tripResponse = await axios.get(`/api/trips/${destination.tripId}`);
+            trip = tripResponse.data?.trip || tripResponse.data;
+          } catch (err) {
+            console.error("Error fetching trip:", err);
           }
+        }
+
+        setData({
+          destination,
+          activities: linkedActivities,
+          trip,
+          budget: destination.budget,
+        });
+        setFormData({
+          name: destination.name,
+          place: destination.place,
+          country: destination.country,
+          description: destination.description || "",
+          mainPhotoUrl: destination.mainPhotoUrl || "",
+          estimatedBudget: destination.estimatedBudget || 0,
+          currency: destination.currency || "EUR",
+          urls: destination.urls || [],
+          latitude: destination.latitude || 0,
+          longitude: destination.longitude || 0,
+          status: destination.status,
+          public: destination.public || false,
+        });
+        setUrlInput((destination.urls || []).join("\n"));
+      } catch (error: any) {
+        // If destination not found (404), try fallback lookup endpoint (for item-references)
+        if (error?.response?.status === 404) {
+          console.log("Destination not found, trying item-reference lookup...");
+          try {
+            const lookupResponse = await axios.get(`/api/destinations/lookup?id=${id}`);
+            const { destination: lookupDestination, isReference, referenceId } = lookupResponse.data;
+
+            // Fetch activities (activities are linked to original destination)
+            let activities: Activity[] = [];
+            if (lookupDestination.originalDestinationId) {
+              try {
+                const activitiesResponse = await axios.get(`/api/activities?destinationId=${lookupDestination.originalDestinationId}`);
+                activities = (activitiesResponse.data.activities || activitiesResponse.data).filter(
+                  (activity: Activity) => activity.destinationId === lookupDestination.originalDestinationId
+                );
+              } catch (err) {
+                console.error("Error fetching activities:", err);
+              }
+            }
+
+            setData({
+              destination: lookupDestination,
+              activities,
+              trip: undefined,
+              budget: undefined,
+            });
+            setFormData({
+              name: lookupDestination.name,
+              place: lookupDestination.place,
+              country: lookupDestination.country,
+              description: lookupDestination.description || "",
+              mainPhotoUrl: lookupDestination.mainPhotoUrl || "",
+              estimatedBudget: lookupDestination.estimatedBudget || 0,
+              currency: lookupDestination.currency || "EUR",
+              urls: lookupDestination.urls || [],
+              latitude: lookupDestination.latitude || 0,
+              longitude: lookupDestination.longitude || 0,
+              status: lookupDestination.status || "proposed",
+              public: lookupDestination.public || false,
+            });
+            setUrlInput((lookupDestination.urls || []).join("\n"));
+          } catch (lookupError: any) {
+            console.error("Error with fallback lookup:", lookupError);
+            if (lookupError?.response?.status === 401) {
+              // User not authenticated
+              throw lookupError;
+            } else if (lookupError?.response?.status === 403) {
+              // Access denied after lookup
+              setAccessDenied(true);
+              const errorData = lookupError?.response?.data;
+              if (errorData?.tripId && errorData?.tripName) {
+                setDenialReason({
+                  tripId: errorData.tripId,
+                  tripName: errorData.tripName,
+                  tripOwnerEmail: errorData.tripOwnerEmail,
+                });
+              }
+            } else {
+              throw lookupError;
+            }
+          }
+        } else {
+          // Not a 404, re-throw the error
           throw error;
-        }),
-      ]);
-      
-      const destination = destResponse.data;
-      // Filter activities by destinationId
-      const linkedActivities = (activitiesResponse.data.activities || activitiesResponse.data).filter(
-        (activity: Activity) => activity.destinationId === id
-      );
-      
-      // Fetch trip if destination is linked to a trip
-      let trip: Trip | undefined;
-      if (destination.tripId) {
-        try {
-          const tripResponse = await axios.get(`/api/trips/${destination.tripId}`);
-          trip = tripResponse.data?.trip || tripResponse.data;
-        } catch (err) {
-          console.error("Error fetching trip:", err);
         }
       }
-      
-      setData({
-        destination,
-        activities: linkedActivities,
-        trip,
-        budget: destination.budget,
-      });
-      setFormData({
-        name: destination.name,
-        place: destination.place,
-        country: destination.country,
-        description: destination.description || "",
-        mainPhotoUrl: destination.mainPhotoUrl || "",
-        estimatedBudget: destination.estimatedBudget || 0,
-        currency: destination.currency || "EUR",
-        urls: destination.urls || [],
-        latitude: destination.latitude || 0,
-        longitude: destination.longitude || 0,
-        status: destination.status,
-        public: destination.public || false,
-      });
-      setUrlInput((destination.urls || []).join("\n"));
     } catch (error: any) {
       console.error("Error fetching destination:", error);
-      
+
       // Handle permission denied errors
       if (error?.response?.status === 403) {
         setAccessDenied(true);
@@ -176,29 +246,39 @@ export default function DestinationDetail() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      const urlList = urlInput
-        .split("\n")
-        .map((url) => url.trim())
-        .filter((url) => url.length > 0);
+      // Check if this is a linked destination (reference)
+      if (data?.destination?.isLinkedByUser) {
+        // For linked destinations, only update status via reference endpoint
+        await axios.put(`/api/destination-references/${data.destination.referenceId}`, {
+          status: formData.status,
+          notes: data.destination.notes,
+        });
+      } else {
+        // For owned destinations, allow full editing
+        const urlList = urlInput
+          .split("\n")
+          .map((url) => url.trim())
+          .filter((url) => url.length > 0);
 
-      // Check if place or country has changed
-      const placeChanged = data?.destination && formData.place !== data.destination.place;
-      const countryChanged = data?.destination && formData.country !== data.destination.country;
+        // Check if place or country has changed
+        const placeChanged = data?.destination && formData.place !== data.destination.place;
+        const countryChanged = data?.destination && formData.country !== data.destination.country;
 
-      // Fetch updated coordinates if place or country changed
-      if (placeChanged || countryChanged) {
-        const coords = await fetchCoordinates(formData.place, formData.country);
-        if (coords) {
-          formData.latitude = coords.latitude;
-          formData.longitude = coords.longitude;
+        // Fetch updated coordinates if place or country changed
+        if (placeChanged || countryChanged) {
+          const coords = await fetchCoordinates(formData.place, formData.country);
+          if (coords) {
+            formData.latitude = coords.latitude;
+            formData.longitude = coords.longitude;
+          }
         }
-      }
 
-      await axios.put(`/api/destinations/${id}`, {
-        ...formData,
-        urls: urlList,
-        public: formData.public,
-      });
+        await axios.put(`/api/destinations/${id}`, {
+          ...formData,
+          urls: urlList,
+          public: formData.public,
+        });
+      }
       setIsEditing(false);
       await fetchData();
     } catch (error) {
@@ -210,12 +290,26 @@ export default function DestinationDetail() {
   };
 
   const handleDelete = async () => {
-    if (!confirm("Are you sure you want to delete this destination?")) return;
-    try {
-      await axios.delete(`/api/destinations/${id}`);
-      router.push("/destinations");
-    } catch (error) {
-      console.error("Error deleting destination:", error);
+    // Check if this is a linked destination (reference)
+    if (data?.destination?.isLinkedByUser) {
+      if (!confirm("Remove this destination from your trip?")) return;
+      try {
+        await axios.delete(`/api/destination-references/${data.destination.referenceId}`);
+        router.back();
+      } catch (error) {
+        console.error("Error removing destination reference:", error);
+        alert("Failed to remove destination from trip");
+      }
+    } else {
+      // For owned destinations
+      if (!confirm("Are you sure you want to delete this destination?")) return;
+      try {
+        await axios.delete(`/api/destinations/${id}`);
+        router.push("/destinations");
+      } catch (error) {
+        console.error("Error deleting destination:", error);
+        alert("Failed to delete destination");
+      }
     }
   };
 
@@ -343,6 +437,7 @@ export default function DestinationDetail() {
 
   const { destination, activities, budget } = data;
   const isOwner = session?.user?.email === destination.addedBy;
+  const isReference = destination.isLinkedByUser || data?.destination?.isReference;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -362,26 +457,25 @@ export default function DestinationDetail() {
               <h1 className="text-4xl font-bold text-gray-800">{formData.name}</h1>
               <p className="text-gray-600 text-lg mt-2">{formData.place}, {formData.country}</p>
               <div className="flex gap-4 mt-4">
-              <button
-                onClick={handleVote}
-                disabled={data?.trip ? isViewer(data.trip, session?.user?.email || "") : false}
-                className={`px-4 py-2 rounded-lg flex items-center gap-2 ${
-                  data?.trip && isViewer(data.trip, session?.user?.email || "")
-                    ? "bg-gray-400 text-gray-600 cursor-not-allowed"
-                    : "bg-green-600 text-white hover:bg-green-700"
-                }`}
-                title={data?.trip && isViewer(data.trip, session?.user?.email || "") ? "Guests cannot vote" : ""}
-              >
-                👍 Vote ({destination.votes})
-              </button>
+                <button
+                  onClick={handleVote}
+                  disabled={data?.trip ? isViewer(data.trip, session?.user?.email || "") : false}
+                  className={`px-4 py-2 rounded-lg flex items-center gap-2 ${data?.trip && isViewer(data.trip, session?.user?.email || "")
+                      ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                      : "bg-green-600 text-white hover:bg-green-700"
+                    }`}
+                  title={data?.trip && isViewer(data.trip, session?.user?.email || "") ? "Guests cannot vote" : ""}
+                >
+                  👍 Vote ({destination.votes})
+                </button>
               </div>
             </div>
-            {isOwner && (
+            {(isOwner || isReference) && (
               <button
                 onClick={() => setIsEditing(!isEditing)}
                 className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
-                {isEditing ? "Cancel" : "✏️ Edit"}
+                {isEditing ? "Cancel" : isReference ? "📋 Status" : "✏️ Edit"}
               </button>
             )}
           </div>
@@ -409,7 +503,7 @@ export default function DestinationDetail() {
                 <p className="text-gray-700 text-lg leading-relaxed">{formData.description}</p>
               </div>
             )}
-            
+
             {formData.urls && formData.urls.length > 0 && (
               <div className="bg-white rounded-lg shadow p-6 mb-8">
                 <h2 className="text-2xl font-bold text-gray-800 mb-4">Useful Links</h2>
@@ -433,353 +527,395 @@ export default function DestinationDetail() {
         )}
 
         {/* Edit Form */}
-        {isEditing && isOwner && (
+        {isEditing && (isOwner || isReference) && (
           <div className="bg-white p-6 rounded-lg shadow mb-8 space-y-4">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">Edit Destination Details</h2>
-            
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Name *</label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
+            {isReference && (
+              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded">
+                <p className="text-blue-800 font-semibold">ℹ️ Linked Destination</p>
+                <p className="text-blue-700 text-sm mt-1">
+                  This is a destination linked from a public listing. You can only change the status for your trip.
+                  To edit other details, contact the original destination creator.
+                </p>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
-                <select
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="proposed">Proposed</option>
-                  <option value="accepted">Accepted</option>
-                  <option value="planned">Planned</option>
-                  <option value="visited">Visited</option>
-                </select>
-              </div>
-            </div>
+            )}
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Place *</label>
-                <input
-                  type="text"
-                  value={formData.place}
-                  onChange={(e) => setFormData({ ...formData, place: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Country *</label>
-                <input
-                  type="text"
-                  value={formData.country}
-                  onChange={(e) => setFormData({ ...formData, country: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-            </div>
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">
+              {isReference ? "Update Trip Status" : "Edit Destination Details"}
+            </h2>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"
-              />
-            </div>
+            {isReference ? (
+              <>
+                {/* Limited editing for references */}
+                <div className="bg-gray-50 p-4 rounded border border-gray-200">
+                  <p className="font-semibold text-gray-800">{formData.name}</p>
+                  <p className="text-sm text-gray-600">{formData.place}, {formData.country}</p>
+                  {formData.description && (
+                    <p className="text-sm text-gray-600 mt-2 line-clamp-3">{formData.description}</p>
+                  )}
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Estimated Budget</label>
-                <input
-                  type="number"
-                  value={formData.estimatedBudget}
-                  onChange={(e) => setFormData({ ...formData, estimatedBudget: +e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Currency</label>
-                <select
-                  value={formData.currency}
-                  onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option>EUR</option>
-                  <option>USD</option>
-                  <option>GBP</option>
-                  <option>JPY</option>
-                </select>
-              </div>
-            </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="proposed">Proposed</option>
+                    <option value="accepted">Accepted</option>
+                    <option value="planned">Planned</option>
+                    <option value="visited">Visited</option>
+                  </select>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Full editing for owned destinations */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Name *</label>
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+                    <select
+                      value={formData.status}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="proposed">Proposed</option>
+                      <option value="accepted">Accepted</option>
+                      <option value="planned">Planned</option>
+                      <option value="visited">Visited</option>
+                    </select>
+                  </div>
+                </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">Main Photo URL</label>
-              <input
-                type="url"
-                value={formData.mainPhotoUrl}
-                onChange={(e) => setFormData({ ...formData, mainPhotoUrl: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Place *</label>
+                    <input
+                      type="text"
+                      value={formData.place}
+                      onChange={(e) => setFormData({ ...formData, place: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Country *</label>
+                    <input
+                      type="text"
+                      value={formData.country}
+                      onChange={(e) => setFormData({ ...formData, country: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1">URLs (one per line)</label>
-              <textarea
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16 font-mono text-sm"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Latitude</label>
-                <input
-                  type="number"
-                  value={formData.latitude}
-                  onChange={(e) => setFormData({ ...formData, latitude: +e.target.value })}
-                  step="0.000001"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Longitude</label>
-                <input
-                  type="number"
-                  value={formData.longitude}
-                  onChange={(e) => setFormData({ ...formData, longitude: +e.target.value })}
-                  step="0.000001"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
-
-            <div className="border-t pt-4 mt-6">
-              <label className="flex items-center justify-between cursor-pointer">
-                <span className="text-sm font-semibold text-gray-700">Share This Destination Publicly</span>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, public: !formData.public })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    formData.public ? 'bg-green-600' : 'bg-gray-300'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      formData.public ? 'translate-x-5' : 'translate-x-1'
-                    }`}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"
                   />
-                </button>
-              </label>
-              <p className="text-xs text-gray-500 mt-2">
-                {formData.public ? '🌐 This destination is shared publicly and other users can discover and add it to their trips.' : '🔒 This destination is private and only visible to you.'}
-              </p>
-            </div>
+                </div>
 
-            <div className="flex gap-3 pt-4 mt-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Estimated Budget</label>
+                    <input
+                      type="number"
+                      value={formData.estimatedBudget}
+                      onChange={(e) => setFormData({ ...formData, estimatedBudget: +e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Currency</label>
+                    <select
+                      value={formData.currency}
+                      onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option>EUR</option>
+                      <option>USD</option>
+                      <option>GBP</option>
+                      <option>JPY</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Main Photo URL</label>
+                  <input
+                    type="url"
+                    value={formData.mainPhotoUrl}
+                    onChange={(e) => setFormData({ ...formData, mainPhotoUrl: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">URLs (one per line)</label>
+                  <textarea
+                    value={urlInput}
+                    onChange={(e) => setUrlInput(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16 font-mono text-sm"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Latitude</label>
+                    <input
+                      type="number"
+                      value={formData.latitude}
+                      onChange={(e) => setFormData({ ...formData, latitude: +e.target.value })}
+                      step="0.000001"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Longitude</label>
+                    <input
+                      type="number"
+                      value={formData.longitude}
+                      onChange={(e) => setFormData({ ...formData, longitude: +e.target.value })}
+                      step="0.000001"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="border-t pt-4 mt-6">
+                  {!isReference && (
+                    <label className="flex items-center justify-between cursor-pointer">
+                      <span className="text-sm font-semibold text-gray-700">Share This Destination Publicly</span>
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, public: !formData.public })}
+                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${formData.public ? 'bg-green-600' : 'bg-gray-300'
+                          }`}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${formData.public ? 'translate-x-5' : 'translate-x-1'
+                            }`}
+                        />
+                      </button>
+                    </label>
+                  )}
+                  {!isReference && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      {formData.public ? '🌐 This destination is shared publicly and other users can discover and add it to their trips.' : '🔒 This destination is private and only visible to you.'}
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
+
+            <div className="flex gap-3 pt-4 mt-6 border-t">
               <button
                 onClick={handleSave}
                 disabled={saving}
                 className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
               >
-                {saving ? "Saving..." : "Save Changes"}
+                {saving ? "Saving..." : isReference ? "Update Status" : "Save Changes"}
               </button>
               <button
                 onClick={handleDelete}
                 className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
               >
-                Delete
+                {isReference ? "Remove from Trip" : "Delete"}
               </button>
             </div>
           </div>
         )}
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Left Column - Activities */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">Linked Activities</h2>
-              <Link href={`/activities?destinationId=${id}`}>
-                <button 
-                  disabled={data?.trip ? isViewer(data.trip, session?.user?.email || "") : false}
-                  className={`px-3 py-1 rounded text-sm ${
-                    data?.trip && isViewer(data.trip, session?.user?.email || "")
-                      ? "bg-gray-400 text-gray-600 cursor-not-allowed"
-                      : "bg-blue-600 text-white hover:bg-blue-700"
-                  }`}
-                  title={data?.trip && isViewer(data.trip, session?.user?.email || "") ? "Guests cannot add activities" : ""}
-                >
-                  + Add Activity
-                </button>
-              </Link>
-            </div>
-            
-            {activities.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No activities yet</p>
-            ) : (
-              <div className="space-y-4">
-                {activities.map((activity) => (
-                  <div key={activity.id} className="p-4 border border-gray-200 rounded-lg hover:border-blue-400 transition">
-                    <div className="flex justify-between items-start">
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-gray-800">{activity.name}</h3>
-                        <p className="text-sm text-gray-600 mt-1">{activity.description}</p>
-                        <div className="flex gap-2 mt-2 text-sm">
-                          <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded capitalize">{activity.category}</span>
-                          {activity.duration && (
-                            <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded">{activity.duration}</span>
-                          )}
-                        </div>
-                        {activity.estimatedCost && (
-                          <p className="text-sm text-gray-700 mt-2">💰 {activity.currency} {activity.estimatedCost.toLocaleString()}</p>
-                        )}
-                      </div>
-                      <Link href={`/activities/${activity.id}`}>
-                        <button className="text-blue-600 hover:text-blue-800 text-sm">View</button>
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Right Column - Budget */}
-          {data?.trip && canViewTripBudget(data.trip, session?.user?.email) ? (
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Budget</h2>
-              
-              {formData.estimatedBudget ? (
-              <div className="space-y-6">
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <p className="text-sm text-gray-600">Estimated Budget</p>
-                  <p className="text-3xl font-bold text-blue-600">{formData.currency} {formData.estimatedBudget.toLocaleString()}</p>
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              {/* Left Column - Activities */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">Linked Activities</h2>
+                  <Link href={`/activities?destinationId=${id}`}>
+                    <button
+                      disabled={data?.trip ? isViewer(data.trip, session?.user?.email || "") : false}
+                      className={`px-3 py-1 rounded text-sm ${data?.trip && isViewer(data.trip, session?.user?.email || "")
+                          ? "bg-gray-400 text-gray-600 cursor-not-allowed"
+                          : "bg-blue-600 text-white hover:bg-blue-700"
+                        }`}
+                      title={data?.trip && isViewer(data.trip, session?.user?.email || "") ? "Guests cannot add activities" : ""}
+                    >
+                      + Add Activity
+                    </button>
+                  </Link>
                 </div>
 
-                {budget ? (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="p-4 bg-green-50 rounded-lg">
-                        <p className="text-sm text-gray-600">Remaining</p>
-                        <p className="text-2xl font-bold text-green-600">{budget.currency} {budget.remaining.toLocaleString()}</p>
-                      </div>
-                      <div className="p-4 bg-orange-50 rounded-lg">
-                        <p className="text-sm text-gray-600">Spent</p>
-                        <p className="text-2xl font-bold text-orange-600">{budget.currency} {budget.spent.toLocaleString()}</p>
-                      </div>
-                    </div>
-
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div
-                        className="bg-orange-500 h-3 rounded-full transition-all"
-                        style={{ width: `${Math.min((budget.spent / budget.totalBudget) * 100, 100)}%` }}
-                      />
-                    </div>
-
-                    {budget.expenses && budget.expenses.length > 0 && (
-                      <div>
-                        <h3 className="font-semibold text-gray-800 mb-3">Recent Expenses</h3>
-                        <div className="space-y-2 max-h-48 overflow-y-auto">
-                          {budget.expenses.slice(0, 5).map((expense: any, idx: number) => (
-                            <div key={idx} className="flex justify-between text-sm">
-                              <span className="text-gray-700">{expense.description}</span>
-                              <span className="text-gray-600">{budget.currency} {expense.amount}</span>
+                {activities.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No activities yet</p>
+                ) : (
+                  <div className="space-y-4">
+                    {activities.map((activity) => (
+                      <div key={activity.id} className="p-4 border border-gray-200 rounded-lg hover:border-blue-400 transition">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-gray-800">{activity.name}</h3>
+                            <p className="text-sm text-gray-600 mt-1">{activity.description}</p>
+                            <div className="flex gap-2 mt-2 text-sm">
+                              <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded capitalize">{activity.category}</span>
+                              {activity.duration && (
+                                <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded">{activity.duration}</span>
+                              )}
                             </div>
-                          ))}
+                            {activity.estimatedCost && (
+                              <p className="text-sm text-gray-700 mt-2">💰 {activity.currency} {activity.estimatedCost.toLocaleString()}</p>
+                            )}
+                          </div>
+                          <Link href={`/activities/${activity.id}`}>
+                            <button className="text-blue-600 hover:text-blue-800 text-sm">View</button>
+                          </Link>
                         </div>
                       </div>
-                    )}
-
-                    {data?.trip && canViewTripBudget(data.trip, session?.user?.email) && (
-                      <Link href={`/budgets?tripId=${data.destination.tripId}&destinationId=${id}`}>
-                        <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                          Manage Budget
-                        </button>
-                      </Link>
-                    )}
-                  </>
-                ) : (
-                  <div className="p-4 bg-gray-50 rounded-lg text-center">
-                    <p className="text-gray-600 mb-4">No budget tracking started yet</p>
-                    {data?.trip && canViewTripBudget(data.trip, session?.user?.email) && (
-                      <Link href={`/budgets?tripId=${data.destination.tripId}&destinationId=${id}`}>
-                        <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
-                          Start Tracking
-                        </button>
-                      </Link>
-                    )}
+                    ))}
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="p-4 bg-gray-50 rounded-lg text-center">
-                <p className="text-gray-600">Set an estimated budget above to track expenses</p>
-              </div>
-            )}
-            </div>
-          ) : null}
-        </div>
 
-        {/* Files Section */}
-        {(() => {
-          // Filter files if user is a viewer on the trip
-          const displayFiles = (() => {
-            if (data?.trip && isViewer(data.trip, session?.user?.email)) {
-              return files.filter(f => f.category === "picture" || f.category === "video");
-            }
-            return files;
-          })();
-          
-          return displayFiles.length > 0 && (
+              {/* Right Column - Budget */}
+              {data?.trip && canViewTripBudget(data.trip, session?.user?.email) ? (
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-6">Budget</h2>
+
+                  {formData.estimatedBudget ? (
+                    <div className="space-y-6">
+                      <div className="p-4 bg-blue-50 rounded-lg">
+                        <p className="text-sm text-gray-600">Estimated Budget</p>
+                        <p className="text-3xl font-bold text-blue-600">{formData.currency} {formData.estimatedBudget.toLocaleString()}</p>
+                      </div>
+
+                      {budget ? (
+                        <>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="p-4 bg-green-50 rounded-lg">
+                              <p className="text-sm text-gray-600">Remaining</p>
+                              <p className="text-2xl font-bold text-green-600">{budget.currency} {budget.remaining.toLocaleString()}</p>
+                            </div>
+                            <div className="p-4 bg-orange-50 rounded-lg">
+                              <p className="text-sm text-gray-600">Spent</p>
+                              <p className="text-2xl font-bold text-orange-600">{budget.currency} {budget.spent.toLocaleString()}</p>
+                            </div>
+                          </div>
+
+                          <div className="w-full bg-gray-200 rounded-full h-3">
+                            <div
+                              className="bg-orange-500 h-3 rounded-full transition-all"
+                              style={{ width: `${Math.min((budget.spent / budget.totalBudget) * 100, 100)}%` }}
+                            />
+                          </div>
+
+                          {budget.expenses && budget.expenses.length > 0 && (
+                            <div>
+                              <h3 className="font-semibold text-gray-800 mb-3">Recent Expenses</h3>
+                              <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {budget.expenses.slice(0, 5).map((expense: any, idx: number) => (
+                                  <div key={idx} className="flex justify-between text-sm">
+                                    <span className="text-gray-700">{expense.description}</span>
+                                    <span className="text-gray-600">{budget.currency} {expense.amount}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {data?.trip && canViewTripBudget(data.trip, session?.user?.email) && (
+                            <Link href={`/budgets?tripId=${data.destination.tripId}&destinationId=${id}`}>
+                              <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                Manage Budget
+                              </button>
+                            </Link>
+                          )}
+                        </>
+                      ) : (
+                        <div className="p-4 bg-gray-50 rounded-lg text-center">
+                          <p className="text-gray-600 mb-4">No budget tracking started yet</p>
+                          {data?.trip && canViewTripBudget(data.trip, session?.user?.email) && (
+                            <Link href={`/budgets?tripId=${data.destination.tripId}&destinationId=${id}`}>
+                              <button className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                Start Tracking
+                              </button>
+                            </Link>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-gray-50 rounded-lg text-center">
+                      <p className="text-gray-600">Set an estimated budget above to track expenses</p>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+
+            {/* Files Section */}
+            {(() => {
+              // Filter files if user is a viewer on the trip
+              const displayFiles = (() => {
+                if (data?.trip && isViewer(data.trip, session?.user?.email)) {
+                  return files.filter(f => f.category === "picture" || f.category === "video");
+                }
+                return files;
+              })();
+
+              return displayFiles.length > 0 && (
+                <div className="bg-white rounded-lg shadow p-6 mt-8">
+                  <h2 className="text-2xl font-bold text-gray-800 mb-6">📄 DESTINATION FILES</h2>
+                  <FilesList
+                    files={displayFiles}
+                    onDelete={handleDeleteFile}
+                  />
+                </div>
+              );
+            })()}
+
+            {/* Additional Info */}
             <div className="bg-white rounded-lg shadow p-6 mt-8">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">📄 DESTINATION FILES</h2>
-              <FilesList 
-                files={displayFiles} 
-                onDelete={handleDeleteFile}
-              />
-            </div>
-          );
-        })()}
-
-        {/* Additional Info */}
-        <div className="bg-white rounded-lg shadow p-6 mt-8">
-          <h2 className="text-xl font-bold text-gray-800 mb-4">Details</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-            <div>
-              <p className="text-gray-600">Status</p>
-              <p className={`font-semibold capitalize ${
-                formData.status === "proposed" ? "text-yellow-600" :
-                formData.status === "accepted" ? "text-green-600" :
-                formData.status === "planned" ? "text-blue-600" :
-                "text-purple-600"
-              }`}>{formData.status}</p>
-            </div>
-            <div>
-              <p className="text-gray-600">Votes</p>
-              <p className="font-semibold">{destination.votes}</p>
-            </div>
-            <div>
-              <p className="text-gray-600">Added By</p>
-              <p className="font-semibold text-xs">{destination.addedBy}</p>
-            </div>
-            {destination.latitude && destination.longitude && (
-              <div>
-                <p className="text-gray-600">Coordinates</p>
-                <p className="font-semibold text-xs">{destination.latitude.toFixed(4)}, {destination.longitude.toFixed(4)}</p>
+              <h2 className="text-xl font-bold text-gray-800 mb-4">Details</h2>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                <div>
+                  <p className="text-gray-600">Status</p>
+                  <p className={`font-semibold capitalize ${formData.status === "proposed" ? "text-yellow-600" :
+                      formData.status === "accepted" ? "text-green-600" :
+                        formData.status === "planned" ? "text-blue-600" :
+                          "text-purple-600"
+                    }`}>{formData.status}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Votes</p>
+                  <p className="font-semibold">{destination.votes}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Added By</p>
+                  <p className="font-semibold text-xs">{destination.addedBy}</p>
+                </div>
+                {destination.latitude && destination.longitude && (
+                  <div>
+                    <p className="text-gray-600">Coordinates</p>
+                    <p className="font-semibold text-xs">{destination.latitude.toFixed(4)}, {destination.longitude.toFixed(4)}</p>
+                  </div>
+                )}
               </div>
-            )}
+            </div>
           </div>
-        </div>
-      </div>
     </div>
-  );
+      );
 }

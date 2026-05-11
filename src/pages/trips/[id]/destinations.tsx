@@ -4,7 +4,7 @@ import axios from "axios";
 import Link from "next/link";
 import { Trip, Destination, Activity } from "@/types/schema";
 import { DestinationMap } from "@/components/DestinationMap";
-import { useCoordinateFetcher } from "@/hooks/useCoordinateFetcher";
+
 import { fetchCoordinates } from "@/lib/coordinatesHelper";
 import { Topbar } from "@/components/Topbar";
 
@@ -98,22 +98,7 @@ export default function TripDestinations() {
     }
   };
 
-  // Fetch coordinates from backend API when place/country changes
-  const fetchCoordinates = useCoordinateFetcher((lat, lon) => {
-    setFormData((prev) => ({
-      ...prev,
-      latitude: lat,
-      longitude: lon,
-    }));
-  });
-
-  const fetchEditCoordinates = useCoordinateFetcher((lat, lon) => {
-    setEditFormData((prev) => ({
-      ...prev,
-      latitude: lat,
-      longitude: lon,
-    }));
-  });
+  // Coordinate fetching is now handled directly in form handlers
 
   const handleOpenAddModal = () => {
     setShowAddModal(true);
@@ -178,17 +163,24 @@ export default function TripDestinations() {
     if (!id) return;
 
     try {
+      const updatedFormData = { ...formData };
+      
       // Fetch coordinates if place/country provided
       if (formData.place || formData.country) {
-        const coords = await fetchCoordinates(formData.place, formData.country);
-        if (coords) {
-          formData.latitude = coords.latitude;
-          formData.longitude = coords.longitude;
+        try {
+          const coords = await fetchCoordinates(formData.place, formData.country);
+          if (coords) {
+            updatedFormData.latitude = coords.latitude;
+            updatedFormData.longitude = coords.longitude;
+          }
+        } catch (coordError) {
+          console.warn("Could not fetch coordinates:", coordError);
+          // Continue without coordinates if fetch fails
         }
       }
 
       await axios.post("/api/destinations", {
-        ...formData,
+        ...updatedFormData,
         tripId: id,
         status: "proposed",
       });
@@ -212,11 +204,13 @@ export default function TripDestinations() {
     }
   };
 
-  const handleRemoveDestination = async (destId: string) => {
+  const handleRemoveDestination = async (destId: string, isReference?: boolean) => {
     if (!confirm("Remove this destination from the trip?")) return;
 
     try {
-      await axios.delete(`/api/destinations/${destId}`);
+      // Use appropriate endpoint based on whether it's a reference or direct destination
+      const endpoint = isReference ? `/api/destination-references/${destId}` : `/api/destinations/${destId}`;
+      await axios.delete(endpoint);
       // Refresh destinations
       fetchData();
     } catch (error) {
@@ -242,7 +236,7 @@ export default function TripDestinations() {
     }
   };
 
-  const handleOpenEditModal = (destination: Destination) => {
+  const handleOpenEditModal = (destination: any) => {
     setEditingDestination(destination);
     setEditFormData({
       name: destination.name,
@@ -264,23 +258,39 @@ export default function TripDestinations() {
     if (!editingDestination) return;
 
     try {
-      // Check if place or country has changed
-      const placeChanged = editFormData.place !== editingDestination.place;
-      const countryChanged = editFormData.country !== editingDestination.country;
+      const updatedEditFormData = { ...editFormData };
+      
+      // If this is a reference, only update status and notes via reference endpoint
+      if (editingDestination.isReference) {
+        await axios.put(`/api/destination-references/${editingDestination.id}`, {
+          status: updatedEditFormData.status,
+          notes: editingDestination.notes,
+        });
+      } else {
+        // For direct destinations, check if place or country has changed
+        const placeChanged = editFormData.place !== editingDestination.place;
+        const countryChanged = editFormData.country !== editingDestination.country;
 
-      // Fetch updated coordinates if place or country changed
-      if (placeChanged || countryChanged) {
-        const coords = await fetchCoordinates(
-          editFormData.place,
-          editFormData.country
-        );
-        if (coords) {
-          editFormData.latitude = coords.latitude;
-          editFormData.longitude = coords.longitude;
+        // Fetch updated coordinates if place or country changed
+        if (placeChanged || countryChanged) {
+          try {
+            const coords = await fetchCoordinates(
+              editFormData.place,
+              editFormData.country
+            );
+            if (coords) {
+              updatedEditFormData.latitude = coords.latitude;
+              updatedEditFormData.longitude = coords.longitude;
+            }
+          } catch (coordError) {
+            console.warn("Could not fetch coordinates:", coordError);
+            // Continue without coordinates if fetch fails
+          }
         }
+
+        await axios.put(`/api/destinations/${editingDestination.id}`, updatedEditFormData);
       }
 
-      await axios.put(`/api/destinations/${editingDestination.id}`, editFormData);
       setShowEditModal(false);
       setEditingDestination(null);
       // Refresh destinations
@@ -427,7 +437,7 @@ export default function TripDestinations() {
                   </div>
 
                   <button
-                    onClick={() => handleRemoveDestination(dest.id)}
+                    onClick={() => handleRemoveDestination(dest.id, dest.isReference)}
                     className="w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded transition"
                   >
                     Remove from Trip
@@ -719,122 +729,160 @@ export default function TripDestinations() {
       {showEditModal && editingDestination && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-2xl font-bold text-gray-800 mb-4">Edit Destination</h3>
+            <h3 className="text-2xl font-bold text-gray-800 mb-4">
+              {editingDestination.isReference ? "Update Trip Status" : "Edit Destination"}
+            </h3>
+            {editingDestination.isReference && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded text-sm text-blue-800">
+                ℹ️ This is a linked destination. You can only change the status for your trip. To edit other details, contact the original destination creator.
+              </div>
+            )}
             <form onSubmit={handleUpdateDestination} className="space-y-4 pb-20">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Destination Name *</label>
-                <input
-                  type="text"
-                  value={editFormData.name}
-                  onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
-                  placeholder="e.g., Paris"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+              {editingDestination.isReference ? (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Destination Info</label>
+                    <div className="p-3 bg-gray-50 rounded border border-gray-200">
+                      <p className="font-semibold text-gray-800">{editFormData.name}</p>
+                      <p className="text-sm text-gray-600">{editFormData.place}, {editFormData.country}</p>
+                      {editFormData.description && (
+                        <p className="text-sm text-gray-600 mt-2">{editFormData.description}</p>
+                      )}
+                    </div>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Place/Region *</label>
-                <input
-                  type="text"
-                  value={editFormData.place}
-                  onChange={(e) => setEditFormData({ ...editFormData, place: e.target.value })}
-                  placeholder="e.g., Île-de-France"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+                    <select
+                      value={editFormData.status}
+                      onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as any })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="proposed">Proposed</option>
+                      <option value="accepted">Accepted</option>
+                      <option value="planned">Planned</option>
+                      <option value="visited">Visited</option>
+                    </select>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Destination Name *</label>
+                    <input
+                      type="text"
+                      value={editFormData.name}
+                      onChange={(e) => setEditFormData({ ...editFormData, name: e.target.value })}
+                      placeholder="e.g., Paris"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Country *</label>
-                <input
-                  type="text"
-                  value={editFormData.country}
-                  onChange={(e) => setEditFormData({ ...editFormData, country: e.target.value })}
-                  placeholder="e.g., France"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Place/Region *</label>
+                    <input
+                      type="text"
+                      value={editFormData.place}
+                      onChange={(e) => setEditFormData({ ...editFormData, place: e.target.value })}
+                      placeholder="e.g., Île-de-France"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
-                <select
-                  value={editFormData.status}
-                  onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as any })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="proposed">Proposed</option>
-                  <option value="accepted">Accepted</option>
-                  <option value="planned">Planned</option>
-                  <option value="visited">Visited</option>
-                </select>
-              </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Country *</label>
+                    <input
+                      type="text"
+                      value={editFormData.country}
+                      onChange={(e) => setEditFormData({ ...editFormData, country: e.target.value })}
+                      placeholder="e.g., France"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
-                <textarea
-                  value={editFormData.description}
-                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
-                  placeholder="Add details about this destination..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"
-                />
-              </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Status</label>
+                    <select
+                      value={editFormData.status}
+                      onChange={(e) => setEditFormData({ ...editFormData, status: e.target.value as any })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="proposed">Proposed</option>
+                      <option value="accepted">Accepted</option>
+                      <option value="planned">Planned</option>
+                      <option value="visited">Visited</option>
+                    </select>
+                  </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Main Photo URL</label>
-                <input
-                  type="url"
-                  value={editFormData.mainPhotoUrl}
-                  onChange={(e) => setEditFormData({ ...editFormData, mainPhotoUrl: e.target.value })}
-                  placeholder="https://example.com/photo.jpg"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Description</label>
+                    <textarea
+                      value={editFormData.description}
+                      onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                      placeholder="Add details about this destination..."
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-20"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">Estimated Budget</label>
-                <input
-                  type="number"
-                  value={editFormData.estimatedBudget}
-                  onChange={(e) => setEditFormData({ ...editFormData, estimatedBudget: +e.target.value })}
-                  placeholder="e.g., 1000"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Main Photo URL</label>
+                    <input
+                      type="url"
+                      value={editFormData.mainPhotoUrl}
+                      onChange={(e) => setEditFormData({ ...editFormData, mainPhotoUrl: e.target.value })}
+                      placeholder="https://example.com/photo.jpg"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1">URLs (comma separated)</label>
-                <textarea
-                  value={editFormData.urls.join(", ")}
-                  onChange={(e) => setEditFormData({ ...editFormData, urls: e.target.value.split(",").map(u => u.trim()).filter(u => u.length > 0) })}
-                  placeholder="https://example1.com, https://example2.com"
-                  className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
-                />
-              </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">Estimated Budget</label>
+                    <input
+                      type="number"
+                      value={editFormData.estimatedBudget}
+                      onChange={(e) => setEditFormData({ ...editFormData, estimatedBudget: +e.target.value })}
+                      placeholder="e.g., 1000"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
 
-              {/* Coordinates Footer */}
-              <div className="border-t pt-4 mt-6">
-                <div className="text-xs font-semibold text-gray-600 mb-3">Coordinates (Optional)</div>
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="number"
-                    value={editFormData.latitude}
-                    onChange={(e) => setEditFormData({ ...editFormData, latitude: +e.target.value })}
-                    placeholder="Latitude"
-                    step="0.000001"
-                    className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <input
-                    type="number"
-                    value={editFormData.longitude}
-                    onChange={(e) => setEditFormData({ ...editFormData, longitude: +e.target.value })}
-                    placeholder="Longitude"
-                    step="0.000001"
-                    className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-1">URLs (comma separated)</label>
+                    <textarea
+                      value={editFormData.urls.join(", ")}
+                      onChange={(e) => setEditFormData({ ...editFormData, urls: e.target.value.split(",").map(u => u.trim()).filter(u => u.length > 0) })}
+                      placeholder="https://example1.com, https://example2.com"
+                      className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 h-16"
+                    />
+                  </div>
+
+                  {/* Coordinates Footer */}
+                  <div className="border-t pt-4 mt-6">
+                    <div className="text-xs font-semibold text-gray-600 mb-3">Coordinates (Optional)</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        value={editFormData.latitude}
+                        onChange={(e) => setEditFormData({ ...editFormData, latitude: +e.target.value })}
+                        placeholder="Latitude"
+                        step="0.000001"
+                        className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                      <input
+                        type="number"
+                        value={editFormData.longitude}
+                        onChange={(e) => setEditFormData({ ...editFormData, longitude: +e.target.value })}
+                        placeholder="Longitude"
+                        step="0.000001"
+                        className="px-2 py-1 text-xs border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="flex gap-3 pt-4 fixed bottom-6 left-4 right-4 bg-white">
                 <button
@@ -848,7 +896,7 @@ export default function TripDestinations() {
                   type="submit"
                   className="flex-1 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
                 >
-                  Update Destination
+                  {editingDestination.isReference ? "Update Status" : "Update Destination"}
                 </button>
               </div>
             </form>
