@@ -6,7 +6,9 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { Topbar } from "@/components/Topbar";
 import PreferencesPanel from "@/components/PreferencesPanel";
-import { Destination, Activity } from "@/types/schema";
+import { DestinationMap } from "@/components/DestinationMap";
+import { Destination, Activity, Trip } from "@/types/schema";
+import { canEditTrip } from "@/lib/auth-helpers";
 
 export default function MySpace() {
   const router = useRouter();
@@ -14,6 +16,10 @@ export default function MySpace() {
   const [activeTab, setActiveTab] = useState<"overview" | "destinations" | "activities" | "preferences">("overview");
   const [myDestinations, setMyDestinations] = useState<Destination[]>([]);
   const [myActivities, setMyActivities] = useState<Activity[]>([]);
+  const [myTrips, setMyTrips] = useState<Trip[]>([]);
+  const [visitedDestinations, setVisitedDestinations] = useState<Destination[]>([]);
+  const [selectedDestinationForPopup, setSelectedDestinationForPopup] = useState<Destination | null>(null);
+  const [selectedDestinationTripId, setSelectedDestinationTripId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
 
@@ -37,13 +43,14 @@ export default function MySpace() {
   const fetchMyContent = async () => {
     try {
       setLoading(true);
-      const [destRes, actRes] = await Promise.all([
+      const [destRes, actRes, tripsRes] = await Promise.all([
         axios.get("/api/destinations"),
         axios.get("/api/activities"),
+        axios.get("/api/trips"),
       ]);
 
       // Filter to only show content created by user
-      const userEmail = session?.user?.email;
+      const userEmail = session?.user?.email || "";
       const destinations = (destRes.data.destinations || destRes.data).filter(
         (d: Destination) => d.addedBy === userEmail
       );
@@ -51,8 +58,57 @@ export default function MySpace() {
         (a: Activity) => a.addedBy === userEmail
       );
 
+      // Fetch trips and filter for owner/contributor
+      const trips = tripsRes.data.trips || tripsRes.data || [];
+      const userTrips = trips.filter((trip: Trip) => {
+        // Check if user is the creator
+        if (trip.createdBy === userEmail) return true;
+        // Check if user is in people array with owner or contributor role
+        if (trip.people && Array.isArray(trip.people)) {
+          return trip.people.some((p: any) => p.email === userEmail && (p.role === "owner" || p.role === "contributor"));
+        }
+        return false;
+      });
+
+      // Collect visited destinations from trips with trip tracking
+      const destinationToTripMap = new Map<string, string>(); // destId -> tripId mapping
+      const tripDestinations: Destination[] = [];
+      for (const trip of userTrips) {
+        try {
+          const tripDestRes = await axios.get(`/api/destinations?tripId=${trip.id}`);
+          const dests = (tripDestRes.data.destinations || tripDestRes.data) as Destination[];
+          dests
+            .filter((d: Destination) => d.status === "visited")
+            .forEach((dest) => {
+              tripDestinations.push(dest);
+              // Store the first trip this destination is associated with
+              if (!destinationToTripMap.has(dest.id)) {
+                destinationToTripMap.set(dest.id, trip.id);
+              }
+            });
+        } catch (err) {
+          // Silently skip trips that error
+          console.error(`Error fetching destinations for trip ${trip.id}:`, err);
+        }
+      }
+
+      // Combine user's own visited destinations with trip destinations
+      const userVisitedDestinations = destinations.filter(
+        (d: Destination) => d.status === "visited"
+      );
+
+      // Deduplicate by destination ID
+      const deduped = new Map<string, Destination>();
+      [...userVisitedDestinations, ...tripDestinations].forEach((d: Destination) => {
+        deduped.set(d.id, d);
+      });
+
       setMyDestinations(destinations);
       setMyActivities(activities);
+      setMyTrips(userTrips);
+      setVisitedDestinations(Array.from(deduped.values()));
+      // Store the map in sessionStorage or as a ref for later use
+      (window as any).__destToTripMap = destinationToTripMap;
     } catch (error) {
       console.error("Error fetching content:", error);
       toast.error("Failed to load your content");
@@ -184,6 +240,29 @@ export default function MySpace() {
                     <div className="text-sm text-gray-600">Activities</div>
                   </div>
                 </div>
+              </div>
+
+              {/* Visited Destinations Map */}
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">Your Travel Map</h3>
+                {visitedDestinations.length === 0 ? (
+                  <div className="text-center py-8 text-gray-600">
+                    <p>No visited destinations yet. Start planning your trips!</p>
+                  </div>
+                ) : (
+                  <div className="h-96 rounded-lg overflow-hidden">
+                    <DestinationMap
+                      destinations={visitedDestinations}
+                      onDestinationClick={(dest) => {
+                        setSelectedDestinationForPopup(dest);
+                        // Get trip ID from the map we stored during fetch
+                        const destToTripMap = (window as any).__destToTripMap as Map<string, string>;
+                        const tripId = destToTripMap?.get(dest.id) || null;
+                        setSelectedDestinationTripId(tripId);
+                      }}
+                    />
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -409,6 +488,77 @@ export default function MySpace() {
                 </button>
               </Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Visited Destination Popup Modal */}
+      {selectedDestinationForPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6">
+            {/* Header */}
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">{selectedDestinationForPopup.name}</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  {selectedDestinationForPopup.place}, {selectedDestinationForPopup.country}
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedDestinationForPopup(null);
+                  setSelectedDestinationTripId(null);
+                }}
+                className="text-gray-500 hover:text-gray-700 text-2xl"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Status Badge */}
+            <div className="mb-4">
+              <span className="inline-block px-3 py-1 rounded text-sm font-semibold text-white bg-green-600 capitalize">
+                {selectedDestinationForPopup.status}
+              </span>
+            </div>
+
+            {/* Description */}
+            {selectedDestinationForPopup.description && (
+              <div className="mb-4">
+                <p className="text-sm font-semibold text-gray-600 mb-2">Description</p>
+                <p className="text-gray-900">{selectedDestinationForPopup.description}</p>
+              </div>
+            )}
+
+            {/* Links Section */}
+            <div className="border-t border-gray-200 pt-4 mt-4">
+              <p className="text-sm font-semibold text-gray-600 mb-3">Quick Links</p>
+              <div className="space-y-2">
+                <Link href={`/destinations/${selectedDestinationForPopup.id}`}>
+                  <button className="w-full px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition text-sm font-medium">
+                    📍 View Destination
+                  </button>
+                </Link>
+                {selectedDestinationTripId && (
+                  <Link href={`/trips/${selectedDestinationTripId}`}>
+                    <button className="w-full px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 transition text-sm font-medium">
+                      🚗 View Trip
+                    </button>
+                  </Link>
+                )}
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <button
+              onClick={() => {
+                setSelectedDestinationForPopup(null);
+                setSelectedDestinationTripId(null);
+              }}
+              className="w-full mt-4 px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300 transition"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
