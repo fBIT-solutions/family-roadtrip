@@ -6,6 +6,7 @@ import { Trip, Destination, Activity } from "@/types/schema";
 import { DestinationMap } from "@/components/DestinationMap";
 import { useCoordinateFetcher } from "@/hooks/useCoordinateFetcher";
 import { fetchCoordinates } from "@/lib/coordinatesHelper";
+import { Topbar } from "@/components/Topbar";
 
 interface TripDestinationsData {
   trip: Trip;
@@ -302,6 +303,7 @@ export default function TripDestinations() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Topbar />
       {/* Header */}
       <div className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
