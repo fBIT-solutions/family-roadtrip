@@ -71,19 +71,47 @@ export default function MySpace() {
       });
 
       // Collect visited destinations from trips with trip tracking
-      const destinationToTripMap = new Map<string, string>(); // destId -> tripId mapping
+      const destinationToTripMap = new Map<string, string>(); // destId/refId -> tripId mapping
       const tripDestinations: Destination[] = [];
       for (const trip of userTrips) {
         try {
-          const tripDestRes = await axios.get(`/api/destinations?tripId=${trip.id}`);
+          // Fetch both direct destinations and references for this trip
+          const [tripDestRes, refRes] = await Promise.all([
+            axios.get(`/api/destinations?tripId=${trip.id}`),
+            axios.get(`/api/destination-references?tripId=${trip.id}`),
+          ]);
+          
           const dests = (tripDestRes.data.destinations || tripDestRes.data) as Destination[];
+          const refs = (refRes.data.references || refRes.data || []) as any[];
+          
+          // Add visited direct destinations
           dests
             .filter((d: Destination) => d.status === "visited")
             .forEach((dest) => {
               tripDestinations.push(dest);
-              // Store the first trip this destination is associated with
               if (!destinationToTripMap.has(dest.id)) {
                 destinationToTripMap.set(dest.id, trip.id);
+              }
+            });
+          
+          // Add visited references (linked destinations with user-specific status)
+          refs
+            .filter((ref: any) => ref.status === "visited")
+            .forEach((ref) => {
+              // Combine reference data with destination info for display
+              const refDest: Destination = {
+                id: ref.id || ref.destinationId,
+                name: ref.name,
+                place: ref.place,
+                country: ref.country,
+                status: ref.status,
+                description: ref.description,
+                latitude: ref.latitude,
+                longitude: ref.longitude,
+              } as Destination;
+              tripDestinations.push(refDest);
+              if (!destinationToTripMap.has(ref.id)) {
+                destinationToTripMap.set(ref.id, trip.id);
               }
             });
         } catch (err) {
