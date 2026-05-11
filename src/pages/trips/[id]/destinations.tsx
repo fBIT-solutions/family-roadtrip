@@ -4,6 +4,8 @@ import axios from "axios";
 import Link from "next/link";
 import { Trip, Destination, Activity } from "@/types/schema";
 import { DestinationMap } from "@/components/DestinationMap";
+import { useCoordinateFetcher } from "@/hooks/useCoordinateFetcher";
+import { fetchCoordinates } from "@/lib/coordinatesHelper";
 
 interface TripDestinationsData {
   trip: Trip;
@@ -96,72 +98,21 @@ export default function TripDestinations() {
   };
 
   // Fetch coordinates from backend API when place/country changes
-  const fetchCoordinates = useCallback(async (place: string, country: string) => {
-    if (!place && !country) return;
+  const fetchCoordinates = useCoordinateFetcher((lat, lon) => {
+    setFormData((prev) => ({
+      ...prev,
+      latitude: lat,
+      longitude: lon,
+    }));
+  });
 
-    try {
-      const response = await axios.get("/api/coordinates", {
-        params: { place, country },
-      });
-
-      if (response.data.latitude && response.data.longitude) {
-        setFormData((prev) => ({
-          ...prev,
-          latitude: response.data.latitude,
-          longitude: response.data.longitude,
-        }));
-        console.log(`Coordinates fetched: ${response.data.latitude}, ${response.data.longitude}`);
-      }
-    } catch (error) {
-      console.error("Error fetching coordinates:", error);
-      // Silently fail - user can still enter coordinates manually
-    }
-  }, []);
-
-  // Auto-fetch coordinates when place or country changes in Add modal
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (formData.place || formData.country) {
-        fetchCoordinates(formData.place, formData.country);
-      }
-    }, 500); // Debounce for 500ms to avoid excessive API calls
-
-    return () => clearTimeout(timer);
-  }, [formData.place, formData.country, fetchCoordinates]);
-
-  // Fetch coordinates for edit form when place or country changes
-  const fetchEditCoordinates = useCallback(async (place: string, country: string) => {
-    if (!place && !country) return;
-
-    try {
-      const response = await axios.get("/api/coordinates", {
-        params: { place, country },
-      });
-
-      if (response.data.latitude && response.data.longitude) {
-        setEditFormData((prev) => ({
-          ...prev,
-          latitude: response.data.latitude,
-          longitude: response.data.longitude,
-        }));
-        console.log(`Coordinates fetched for edit: ${response.data.latitude}, ${response.data.longitude}`);
-      }
-    } catch (error) {
-      console.error("Error fetching coordinates:", error);
-      // Silently fail - user can still enter coordinates manually
-    }
-  }, []);
-
-  // Auto-fetch coordinates when place or country changes in Edit modal
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (editFormData.place || editFormData.country) {
-        fetchEditCoordinates(editFormData.place, editFormData.country);
-      }
-    }, 500); // Debounce for 500ms to avoid excessive API calls
-
-    return () => clearTimeout(timer);
-  }, [editFormData.place, editFormData.country, fetchEditCoordinates]);
+  const fetchEditCoordinates = useCoordinateFetcher((lat, lon) => {
+    setEditFormData((prev) => ({
+      ...prev,
+      latitude: lat,
+      longitude: lon,
+    }));
+  });
 
   const handleOpenAddModal = () => {
     setShowAddModal(true);
@@ -226,6 +177,15 @@ export default function TripDestinations() {
     if (!id) return;
 
     try {
+      // Fetch coordinates if place/country provided
+      if (formData.place || formData.country) {
+        const coords = await fetchCoordinates(formData.place, formData.country);
+        if (coords) {
+          formData.latitude = coords.latitude;
+          formData.longitude = coords.longitude;
+        }
+      }
+
       await axios.post("/api/destinations", {
         ...formData,
         tripId: id,
@@ -303,6 +263,22 @@ export default function TripDestinations() {
     if (!editingDestination) return;
 
     try {
+      // Check if place or country has changed
+      const placeChanged = editFormData.place !== editingDestination.place;
+      const countryChanged = editFormData.country !== editingDestination.country;
+
+      // Fetch updated coordinates if place or country changed
+      if (placeChanged || countryChanged) {
+        const coords = await fetchCoordinates(
+          editFormData.place,
+          editFormData.country
+        );
+        if (coords) {
+          editFormData.latitude = coords.latitude;
+          editFormData.longitude = coords.longitude;
+        }
+      }
+
       await axios.put(`/api/destinations/${editingDestination.id}`, editFormData);
       setShowEditModal(false);
       setEditingDestination(null);

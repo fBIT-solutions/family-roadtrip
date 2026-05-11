@@ -5,6 +5,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { Trip, Destination, FileMetadata, Expense, Activity, TimelineEvent } from "@/types/schema";
 import Link from "next/link";
+import { Topbar } from "@/components/Topbar";
 import { FilesList } from "@/components/FilesList";
 import { MediaGallery } from "@/components/MediaGallery";
 import { DestinationCardRow } from "@/components/DestinationCardRow";
@@ -167,10 +168,10 @@ export default function TripDetails() {
         axios.get(`/api/trips/${id}`),
         axios.get(`/api/activities?tripId=${id}`),
       ]);
-      
+
       setTripData(tripResponse.data);
       setActivities(activitiesResponse.data.activities || activitiesResponse.data);
-      
+
       // Initialize edit form with trip data
       const trip = tripResponse.data.trip;
       setEditFormData({
@@ -301,7 +302,7 @@ export default function TripDetails() {
 
     const fileInput = document.getElementById("fileInput") as HTMLInputElement;
     const file = fileInput?.files?.[0];
-    
+
     if (!file) {
       toast.error("Please select a file");
       return;
@@ -380,7 +381,7 @@ export default function TripDetails() {
 
     const mediaInput = document.getElementById("mediaInput") as HTMLInputElement;
     const file = mediaInput?.files?.[0];
-    
+
     if (!file) {
       toast.error("Please select a photo or video");
       return;
@@ -484,6 +485,7 @@ export default function TripDetails() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Topbar />
       {/* Header */}
       <div className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
@@ -495,12 +497,11 @@ export default function TripDetails() {
                 <span>📅 {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}</span>
                 <span>⏱️ {trip.days}d</span>
                 <span>🎯 {trip.goal}</span>
-                <span className={`px-2 py-1 rounded font-semibold ${
-                  trip.status === "planning" ? "bg-yellow-100 text-yellow-800" :
-                  trip.status === "active" ? "bg-green-100 text-green-800" :
-                  trip.status === "completed" ? "bg-blue-100 text-blue-800" :
-                  "bg-red-100 text-red-800"
-                }`}>
+                <span className={`px-2 py-1 rounded font-semibold ${trip.status === "planning" ? "bg-yellow-100 text-yellow-800" :
+                    trip.status === "active" ? "bg-green-100 text-green-800" :
+                      trip.status === "completed" ? "bg-blue-100 text-blue-800" :
+                        "bg-red-100 text-red-800"
+                  }`}>
                   {trip.status}
                 </span>
               </div>
@@ -510,14 +511,14 @@ export default function TripDetails() {
                 <button className="w-full px-3 py-2 text-sm sm:text-base bg-gray-300 rounded hover:bg-gray-400 whitespace-nowrap">← Back</button>
               </Link>
               {userRole !== "reader" && (
-                <button 
+                <button
                   onClick={() => setShowEditModal(true)}
                   className="w-full sm:w-auto px-3 py-2 text-sm sm:text-base bg-blue-600 text-white rounded hover:bg-blue-700 whitespace-nowrap">
                   ✏️ Edit
                 </button>
               )}
               {tripData?.trip.createdBy === session?.user?.email && (
-                <button 
+                <button
                   onClick={() => setShowTravelerRequestsModal(true)}
                   className="w-full sm:w-auto px-3 py-2 text-sm sm:text-base bg-purple-600 text-white rounded hover:bg-purple-700 whitespace-nowrap">
                   📋 Requests
@@ -527,39 +528,37 @@ export default function TripDetails() {
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:gap-2 lg:flex-wrap gap-2 mt-4">
             {userRole !== "reader" && (
-              <button 
+              <button
                 onClick={() => setShowFileModal(true)}
                 className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-orange-600 text-white rounded hover:bg-orange-700">
                 📎 Files
               </button>
             )}
-            <button 
+            <button
               onClick={() => setShowMediaModal(true)}
               disabled={userRole === "reader"}
-              className={`px-2 py-2 text-xs sm:text-sm sm:px-4 rounded ${
-                userRole === "reader"
+              className={`px-2 py-2 text-xs sm:text-sm sm:px-4 rounded ${userRole === "reader"
                   ? "bg-gray-400 text-gray-600 cursor-not-allowed"
                   : "bg-pink-600 text-white hover:bg-pink-700"
-              }`}
+                }`}
               title={userRole === "reader" ? "Guests cannot upload media" : ""}
             >
               📸 Media
             </button>
             {userRole !== "reader" && (
-              <button 
+              <button
                 onClick={() => setShowExpenseModal(true)}
                 className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-green-600 text-white rounded hover:bg-green-700">
                 💰 Expense
               </button>
             )}
             <Link href={`/trips/${trip.id}/destinations`} className="col-span-1">
-              <button 
+              <button
                 disabled={userRole === "reader"}
-                className={`w-full px-2 py-2 text-xs sm:text-sm sm:px-4 rounded ${
-                  userRole === "reader"
+                className={`w-full px-2 py-2 text-xs sm:text-sm sm:px-4 rounded ${userRole === "reader"
                     ? "bg-gray-400 text-gray-600 cursor-not-allowed"
                     : "bg-blue-600 text-white hover:bg-blue-700"
-                }`}
+                  }`}
                 title={userRole === "reader" ? "Guests cannot add destinations" : ""}
               >
                 🌍 Destinations
@@ -571,11 +570,10 @@ export default function TripDetails() {
                 setShowAddActivityModal(true);
               }}
               disabled={userRole === "reader"}
-              className={`px-2 py-2 text-xs sm:text-sm sm:px-4 rounded ${
-                userRole === "reader"
+              className={`px-2 py-2 text-xs sm:text-sm sm:px-4 rounded ${userRole === "reader"
                   ? "bg-gray-400 text-gray-600 cursor-not-allowed"
                   : "bg-purple-600 text-white hover:bg-purple-700"
-              }`}
+                }`}
               title={userRole === "reader" ? "Guests cannot add activities" : ""}
             >
               ➕ Activity
@@ -616,7 +614,7 @@ export default function TripDetails() {
           <div className="bg-white rounded-lg shadow p-6 border-t-4 border-orange-500">
             <h3 className="text-xl font-bold text-gray-800 mb-4">📅 TRIP SCHEDULE</h3>
             <div className="overflow-y-auto max-h-96">
-              <Timeline 
+              <Timeline
                 events={events}
                 tripStartDate={trip.startDate}
                 tripEndDate={trip.endDate}
@@ -640,7 +638,7 @@ export default function TripDetails() {
                   <p className="text-2xl font-bold text-gray-800">{trip.currency} {stats.totalBudget.toLocaleString()}</p>
                 </div>
                 <div className="bg-gray-200 rounded-full h-3 overflow-hidden">
-                  <div 
+                  <div
                     className="bg-green-500 h-full transition-all"
                     style={{ width: `${Math.min(budgetPercentage, 100)}%` }}
                   />
@@ -725,8 +723,8 @@ export default function TripDetails() {
         {/* Trip Media Section */}
         <div className="bg-white rounded-lg shadow p-6 border-t-4 border-pink-500 mb-8">
           <h3 className="text-2xl font-bold text-gray-800 mb-6">📸 TRIP MEDIA</h3>
-          <MediaGallery 
-            files={tripFiles} 
+          <MediaGallery
+            files={tripFiles}
             onUploadClick={userRole === "reader" ? undefined : () => setShowMediaModal(true)}
           />
         </div>
@@ -740,21 +738,19 @@ export default function TripDetails() {
                 <div className="flex gap-2">
                   <button
                     onClick={() => setDestinationViewMode("list")}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                      destinationViewMode === "list"
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${destinationViewMode === "list"
                         ? "bg-blue-500 text-white"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
+                      }`}
                   >
                     📋 List
                   </button>
                   <button
                     onClick={() => setDestinationViewMode("map")}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                      destinationViewMode === "map"
+                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${destinationViewMode === "map"
                         ? "bg-blue-500 text-white"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                    }`}
+                      }`}
                   >
                     🗺️ Map
                   </button>
@@ -778,13 +774,13 @@ export default function TripDetails() {
                 {destinations
                   .filter((dest) => destinationFilter === "all" || dest.status === destinationFilter)
                   .map((dest) => (
-                  <DestinationCardRow
-                    key={dest.id}
-                    destination={dest}
-                    files={tripFiles}
-                    activities={activities}
-                  />
-                ))}
+                    <DestinationCardRow
+                      key={dest.id}
+                      destination={dest}
+                      files={tripFiles}
+                      activities={activities}
+                    />
+                  ))}
               </div>
             ) : (
               <DestinationMap
@@ -815,10 +811,10 @@ export default function TripDetails() {
               <option value="other">Other</option>
             </select>
           </div>
-          <FilesList 
+          <FilesList
             files={documentFilter === "all" ? tripFiles : tripFiles.filter(f => f.category === documentFilter)}
-            onDelete={userRole === "reader" ? undefined : handleDeleteFile} 
-            isLoading={deletingFile} 
+            onDelete={userRole === "reader" ? undefined : handleDeleteFile}
+            isLoading={deletingFile}
           />
         </div>
       </div>

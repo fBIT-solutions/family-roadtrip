@@ -20,27 +20,60 @@ export default async function handler(
 
   const { place, country } = req.query;
 
-  if (!place && !country) {
-    return res.status(400).json({ error: "Place or country is required" });
+  if (!place) {
+    return res.status(400).json({ error: "Place is required" });
   }
 
   try {
-    const query = `${place}${place && country ? " " : ""}${country}`.trim();
+    // Build the query string - Nominatim handles country codes well
+    const query = country 
+      ? `${place}, ${country}` 
+      : place;
+
+    console.log(`[coordinates] Fetching coordinates for: "${query}"`);
+
+    // Use OpenStreetMap Nominatim API (free, no API key required)
     const response = await axios.get(
-      `https://www.gps-coordinates.net/geoproxy?q=${encodeURIComponent(query)}`
+      `https://nominatim.openstreetmap.org/search`,
+      {
+        params: {
+          q: query,
+          format: "json",
+          limit: 1,
+        },
+        headers: {
+          // Nominatim requires a User-Agent header
+          "User-Agent": "FamilyRoadtrip2028/1.0 (https://fambalker.nl)",
+        },
+        timeout: 5000, // 5 second timeout
+      }
     );
 
-    if (response.data.results && response.data.results.length > 0) {
-      const { lat, lng } = response.data.results[0].geometry;
-      return res.status(200).json({
-        latitude: lat,
-        longitude: lng,
-      });
+    if (response.data && response.data.length > 0) {
+      const { lat, lon } = response.data[0];
+      const result = {
+        latitude: parseFloat(lat),
+        longitude: parseFloat(lon),
+      };
+      console.log(`[coordinates] Success: ${result.latitude}, ${result.longitude}`);
+      return res.status(200).json(result);
     }
 
-    return res.status(404).json({ error: "No coordinates found" });
-  } catch (error) {
-    console.error("Error fetching coordinates:", error);
-    return res.status(500).json({ error: "Failed to fetch coordinates" });
+    console.log(`[coordinates] No results found for: "${query}"`);
+    return res.status(404).json({ error: "Location not found" });
+  } catch (error: any) {
+    console.error("[coordinates] Error fetching from Nominatim:", error.message);
+    
+    // Provide more specific error messages
+    let errorMessage = "Failed to fetch coordinates";
+    if (error.code === "ECONNREFUSED") {
+      errorMessage = "Nominatim service unavailable";
+    } else if (error.code === "ECONNABORTED" || error.code === "ETIMEDOUT") {
+      errorMessage = "Nominatim request timeout";
+    } else if (error.response?.status === 429) {
+      errorMessage = "Too many requests to Nominatim service";
+    }
+    
+    return res.status(500).json({ error: errorMessage });
   }
 }

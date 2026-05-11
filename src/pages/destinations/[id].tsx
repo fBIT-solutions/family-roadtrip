@@ -7,6 +7,9 @@ import { toast } from "sonner";
 import { Destination, Activity, FileMetadata, Trip } from "@/types/schema";
 import { FilesList } from "@/components/FilesList";
 import { isViewer, canViewTripBudget } from "@/lib/auth-helpers";
+import { useCoordinateFetcher } from "@/hooks/useCoordinateFetcher";
+import { fetchCoordinates } from "@/lib/coordinatesHelper";
+import { Topbar } from "@/components/Topbar";
 
 interface DestinationData {
   destination: Destination;
@@ -51,6 +54,15 @@ export default function DestinationDetail() {
     public: false,
   });
   const [urlInput, setUrlInput] = useState("");
+
+  // Fetch coordinates when form changes
+  const fetchFormCoordinates = useCoordinateFetcher((lat, lon) => {
+    setFormData((prev) => ({
+      ...prev,
+      latitude: lat,
+      longitude: lon,
+    }));
+  });
 
   useEffect(() => {
     if (id && status !== "loading") {
@@ -168,6 +180,19 @@ export default function DestinationDetail() {
         .split("\n")
         .map((url) => url.trim())
         .filter((url) => url.length > 0);
+
+      // Check if place or country has changed
+      const placeChanged = data?.destination && formData.place !== data.destination.place;
+      const countryChanged = data?.destination && formData.country !== data.destination.country;
+
+      // Fetch updated coordinates if place or country changed
+      if (placeChanged || countryChanged) {
+        const coords = await fetchCoordinates(formData.place, formData.country);
+        if (coords) {
+          formData.latitude = coords.latitude;
+          formData.longitude = coords.longitude;
+        }
+      }
 
       await axios.put(`/api/destinations/${id}`, {
         ...formData,
@@ -321,14 +346,19 @@ export default function DestinationDetail() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Topbar />
       {/* Header */}
       <div className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <div className="flex justify-between items-start">
             <div>
-              <Link href="/destinations">
+              {/* <Link href="/destinations">
                 <button className="text-blue-600 hover:text-blue-800 mb-4">← Back to Destinations</button>
-              </Link>
+              </Link> */}
+              <button
+                onClick={() => router.back()}
+                className="flex-1 px-4 py-2 bg-gray-300 text-gray-800 rounded hover:bg-gray-400 font-medium"
+              >← Back</button>
               <h1 className="text-4xl font-bold text-gray-800">{formData.name}</h1>
               <p className="text-gray-600 text-lg mt-2">{formData.place}, {formData.country}</p>
               <div className="flex gap-4 mt-4">
