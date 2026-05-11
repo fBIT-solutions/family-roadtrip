@@ -9,6 +9,15 @@ interface TimelineProps {
   tripId?: string;
 }
 
+interface TimelineEntry {
+  type: "primary" | "checkout" | "return";
+  event: TimelineEvent;
+  title: string;
+  date: Date;
+  icon: string;
+  color: string;
+}
+
 const eventTypeIcons: Record<string, string> = {
   milestone: "🎯",
   event: "📅",
@@ -22,9 +31,50 @@ const eventTypeColors: Record<string, string> = {
 };
 
 export function Timeline({ events, tripStartDate, tripEndDate, tripId }: TimelineProps) {
-  const sortedEvents = [...events].sort(
-    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
-  );
+  // Expand events to include checkout and return entries
+  const expandedEntries: TimelineEntry[] = [];
+
+  events.forEach((event) => {
+    // Determine category for icon/color
+    const isAccommodation = event.category === "Accommodation";
+    const isFlight = event.category === "Flight";
+
+    // Add primary event
+    expandedEntries.push({
+      type: "primary",
+      event,
+      title: event.title,
+      date: new Date(event.date),
+      icon: isAccommodation ? "🏨" : isFlight ? "✈️" : eventTypeIcons[event.type] || "📌",
+      color: isAccommodation ? "text-purple-600" : isFlight ? "text-cyan-600" : eventTypeColors[event.type] || "text-gray-600",
+    });
+
+    // Add checkout for accommodations with end date
+    if (isAccommodation && event.endDateTime) {
+      expandedEntries.push({
+        type: "checkout",
+        event,
+        title: "[Check-out] " + event.title,
+        date: new Date(event.endDateTime),
+        icon: "🚪",
+        color: "text-gray-600",
+      });
+    }
+
+    // Add return for flights with return flight details
+    if (isFlight && event.flightDetails?.returnFlightNumber) {
+      expandedEntries.push({
+        type: "return",
+        event,
+        title: "[Return] " + event.title,
+        date: new Date(event.flightDetails.returnDateTime!),
+        icon: "🔙",
+        color: "text-gray-600",
+      });
+    }
+  });
+
+  const sortedEntries = expandedEntries.sort((a, b) => a.date.getTime() - b.date.getTime());
 
   const formatDate = (date: Date) => {
     return new Date(date).toLocaleDateString("en-US", {
@@ -52,28 +102,32 @@ export function Timeline({ events, tripStartDate, tripEndDate, tripId }: Timelin
         </div>
 
         {/* Events */}
-        {sortedEvents.length > 0 ? (
-          sortedEvents.map((event, index) => (
+        {sortedEntries.length > 0 ? (
+          sortedEntries.map((entry, index) => (
             <Link 
-              key={event.id} 
-              href={tripId ? `/trips/${tripId}/schedule#event-${event.id}` : "#"}
+              key={`${entry.event.id}-${entry.type}`} 
+              href={tripId ? `/trips/${tripId}/schedule#event-${entry.event.id}` : "#"}
             >
               <div className="flex gap-4 cursor-pointer hover:opacity-75 transition-opacity">
                 <div className="flex flex-col items-center">
                   <div
                     className={`w-10 h-10 rounded-full ${
-                      event.completed
+                      entry.event.completed
                         ? "bg-gray-400"
-                        : event.type === "milestone"
+                        : entry.event.category === "accommodation"
+                        ? "bg-purple-500"
+                        : entry.event.category === "flight"
+                        ? "bg-cyan-500"
+                        : entry.event.type === "milestone"
                         ? "bg-blue-500"
-                        : event.type === "deadline"
+                        : entry.event.type === "deadline"
                         ? "bg-red-500"
                         : "bg-green-500"
                     } text-white flex items-center justify-center font-semibold text-lg flex-shrink-0`}
                   >
-                    {eventTypeIcons[event.type]}
+                    {entry.icon}
                   </div>
-                  {index < sortedEvents.length - 1 && (
+                  {index < sortedEntries.length - 1 && (
                     <div className="w-1 flex-grow bg-gray-300 min-h-16" />
                   )}
                 </div>
@@ -82,57 +136,76 @@ export function Timeline({ events, tripStartDate, tripEndDate, tripId }: Timelin
                     <div className="flex-1">
                       <p
                         className={`font-semibold text-sm ${
-                          event.completed
+                          entry.event.completed
                             ? "line-through text-gray-500"
                             : "text-gray-800 hover:text-blue-600"
                         }`}
                       >
-                        {event.title}
+                        {entry.title}
                       </p>
                       <p className="text-xs text-gray-600">
-                        {formatDate(event.date)}
-                        {event.startDateTime && event.endDateTime && (
+                        {formatDate(entry.date)}
+                        {entry.event.startDateTime && entry.event.endDateTime && entry.type === "primary" && (
                           <>
                             <br />
-                            {new Date(event.startDateTime).toLocaleTimeString(
+                            {new Date(entry.event.startDateTime).toLocaleTimeString(
                               "en-US",
                               { hour: "2-digit", minute: "2-digit" }
                             )}{" "}
                             -{" "}
-                            {new Date(event.endDateTime).toLocaleTimeString(
+                            {new Date(entry.event.endDateTime).toLocaleTimeString(
                               "en-US",
                               { hour: "2-digit", minute: "2-digit" }
                             )}
                           </>
                         )}
+                        {entry.type === "checkout" && entry.event.endDateTime && (
+                          <>
+                            <br />
+                            {new Date(entry.event.endDateTime).toLocaleTimeString(
+                              "en-US",
+                              { hour: "2-digit", minute: "2-digit" }
+                            )}
+                          </>
+                        )}
+                        {entry.type === "return" && entry.event.flightDetails?.returnDateTime && (
+                          <>
+                            <br />
+                            {new Date(entry.event.flightDetails.returnDateTime).toLocaleTimeString(
+                              "en-US",
+                              { hour: "2-digit", minute: "2-digit" }
+                            )}
+                            {" "}({entry.event.flightDetails.returnFlightNumber})
+                          </>
+                        )}
                       </p>
-                      {event.category && (
+                      {entry.event.category && entry.type === "primary" && (
                         <p className="text-xs text-blue-600 font-medium mt-1">
-                          {event.category}
+                          {entry.event.category}
                         </p>
                       )}
-                      {event.activityId && (
+                      {entry.event.activityId && entry.type === "primary" && (
                         <p className="text-xs text-purple-600 font-medium mt-1">
                           🎯 Linked to activity
                         </p>
                       )}
-                      {event.flightDetails && (
+                      {entry.event.flightDetails && entry.type === "primary" && (
                         <div className="text-xs text-gray-600 mt-2 bg-blue-50 p-2 rounded">
                           <p className="font-semibold text-blue-600">Flight</p>
                           <p>
-                            Depart: {event.flightDetails.departureFlightNumber} @{" "}
+                            Depart: {entry.event.flightDetails.departureFlightNumber} @{" "}
                             {new Date(
-                              event.flightDetails.departureDateTime
+                              entry.event.flightDetails.departureDateTime
                             ).toLocaleTimeString("en-US", {
                               hour: "2-digit",
                               minute: "2-digit",
                             })}
                           </p>
-                          {event.flightDetails.returnFlightNumber && (
+                          {entry.event.flightDetails.returnFlightNumber && (
                             <p>
-                              Return: {event.flightDetails.returnFlightNumber} @{" "}
+                              Return: {entry.event.flightDetails.returnFlightNumber} @{" "}
                               {new Date(
-                                event.flightDetails.returnDateTime!
+                                entry.event.flightDetails.returnDateTime!
                               ).toLocaleTimeString("en-US", {
                                 hour: "2-digit",
                                 minute: "2-digit",
@@ -141,14 +214,14 @@ export function Timeline({ events, tripStartDate, tripEndDate, tripId }: Timelin
                           )}
                         </div>
                       )}
-                      {event.description && (
+                      {entry.event.description && entry.type === "primary" && (
                         <p className="text-xs text-gray-700 mt-2 line-clamp-2">
-                          {event.description}
+                          {entry.event.description}
                         </p>
                       )}
                     </div>
                     <div className="text-xs">
-                      {event.completed && (
+                      {entry.event.completed && entry.type === "primary" && (
                         <span className="bg-green-100 text-green-800 px-2 py-1 rounded">
                           ✓ Done
                         </span>

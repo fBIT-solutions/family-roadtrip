@@ -154,6 +154,40 @@ export const ACTIVITY_STATUS_COLORS: Record<ActivityStatus, string> = {
 // EVENT/TIMELINE CONSTANTS
 // ============================================================================
 
+export const TIMELINE_EVENT_TYPES = [
+  "milestone",
+  "event",
+  "deadline",
+] as const;
+
+export type TimelineEventType = typeof TIMELINE_EVENT_TYPES[number];
+
+export const TIMELINE_EVENT_CATEGORIES = [
+  "flight",
+  "accommodation",
+  "activity",
+  "meal",
+  "transport",
+  "note",
+] as const;
+
+export type TimelineEventCategory = typeof TIMELINE_EVENT_CATEGORIES[number];
+
+export const TIMELINE_EVENT_TYPE_COLORS: Record<TimelineEventType, string> = {
+  milestone: "bg-blue-500",
+  event: "bg-green-500",
+  deadline: "bg-red-500",
+};
+
+export const TIMELINE_EVENT_CATEGORY_COLORS: Record<TimelineEventCategory, string> = {
+  flight: "bg-cyan-500",
+  accommodation: "bg-purple-500",
+  activity: "bg-green-500",
+  meal: "bg-orange-500",
+  transport: "bg-indigo-500",
+  note: "bg-yellow-500",
+};
+
 export const EVENT_TYPES = [
   "flight",
   "accommodation",

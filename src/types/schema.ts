@@ -81,10 +81,10 @@ export const TimelineEventSchema = z.object({
   title: z.string(),
   description: z.string().optional(),
   date: z.coerce.date(),
-  startDateTime: z.coerce.date().optional(), // For range/flight events
-  endDateTime: z.coerce.date().optional(), // For range/flight events
+  startDateTime: z.coerce.date().optional(), // For range/flight/accommodation events
+  endDateTime: z.coerce.date().optional(), // For range/flight/accommodation events (check-out for accommodations)
   type: z.enum(["milestone", "event", "deadline"]),
-  category: z.string().optional(), // Predefined categories: flight, reservation, activity, etc
+  category: z.string().optional(), // Categories: "flight", "accommodation", "activity", etc.
   activityId: z.string().uuid().optional(), // Link to existing activity (for Activity category)
   flightDetails: z.object({
     departureFlightNumber: z.string(),
