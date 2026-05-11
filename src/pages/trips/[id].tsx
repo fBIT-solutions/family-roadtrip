@@ -301,41 +301,62 @@ export default function TripDetails() {
     if (!id) return;
 
     const fileInput = document.getElementById("fileInput") as HTMLInputElement;
-    const file = fileInput?.files?.[0];
+    const files = fileInput?.files;
 
-    if (!file) {
-      toast.error("Please select a file");
+    if (!files || files.length === 0) {
+      toast.error("Please select at least one file");
       return;
     }
 
     setUploadingFile(true);
+    const totalFiles = files.length;
+    let successCount = 0;
+    let errorCount = 0;
+
     try {
-      // Convert file to base64
-      const reader = new FileReader();
-      reader.onload = async () => {
+      // Upload each file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         try {
+          // Convert file to base64
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
           await axios.post(`/api/trips/${id}/files`, {
             filename: file.name,
-            fileData: reader.result,
+            fileData: base64,
             category: fileForm.category,
             destinationId: fileForm.destinationId || undefined,
             activityId: fileForm.activityId || undefined,
           });
-          setFileForm({ filename: "", category: "document", destinationId: "", activityId: "" });
-          setShowFileModal(false);
-          await fetchFiles();
-          toast.success("File uploaded successfully!");
+          successCount++;
         } catch (error) {
-          console.error("Error uploading file:", error);
-          toast.error("Failed to upload file");
-        } finally {
-          setUploadingFile(false);
+          console.error(`Error uploading file ${file.name}:`, error);
+          errorCount++;
         }
-      };
-      reader.readAsDataURL(file);
+      }
+
+      // Show results
+      if (successCount > 0) {
+        toast.success(`${successCount} file${successCount > 1 ? "s" : ""} uploaded successfully!`);
+      }
+      if (errorCount > 0) {
+        toast.error(`Failed to upload ${errorCount} file${errorCount > 1 ? "s" : ""}`);
+      }
+
+      if (successCount > 0) {
+        setFileForm({ filename: "", category: "document", destinationId: "", activityId: "" });
+        setShowFileModal(false);
+        await fetchFiles();
+      }
     } catch (error) {
-      console.error("Error uploading file:", error);
-      alert("Failed to upload file");
+      console.error("Error uploading files:", error);
+      toast.error("Failed to upload files");
+    } finally {
       setUploadingFile(false);
     }
   };
@@ -380,48 +401,74 @@ export default function TripDetails() {
     if (!id) return;
 
     const mediaInput = document.getElementById("mediaInput") as HTMLInputElement;
-    const file = mediaInput?.files?.[0];
+    const files = mediaInput?.files;
 
-    if (!file) {
-      toast.error("Please select a photo or video");
+    if (!files || files.length === 0) {
+      toast.error("Please select at least one photo or video");
       return;
     }
 
-    if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
-      toast.error("Please select a valid image or video file");
-      return;
+    // Validate all files first
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+        toast.error(`${file.name} is not a valid image or video file`);
+        return;
+      }
     }
-
-    // Detect category based on file type
-    const category = file.type.startsWith("video/") ? "video" : "picture";
 
     setUploadingMedia(true);
+    const totalFiles = files.length;
+    let successCount = 0;
+    let errorCount = 0;
+
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
+      // Upload each file
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
         try {
+          // Detect category based on file type
+          const category = file.type.startsWith("video/") ? "video" : "picture";
+
+          // Convert file to base64
+          const base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+
           await axios.post(`/api/trips/${id}/files`, {
             filename: file.name,
-            fileData: reader.result,
+            fileData: base64,
             category: category,
             destinationId: undefined,
             activityId: undefined,
           });
-          setMediaForm({ category: "picture" });
-          setShowMediaModal(false);
-          await fetchFiles();
-          toast.success("Media uploaded successfully!");
+          successCount++;
         } catch (error) {
-          console.error("Error uploading media:", error);
-          toast.error("Failed to upload media");
-        } finally {
-          setUploadingMedia(false);
+          console.error(`Error uploading media ${file.name}:`, error);
+          errorCount++;
         }
-      };
-      reader.readAsDataURL(file);
+      }
+
+      // Show results
+      if (successCount > 0) {
+        toast.success(`${successCount} file${successCount > 1 ? "s" : ""} uploaded successfully!`);
+      }
+      if (errorCount > 0) {
+        toast.error(`Failed to upload ${errorCount} file${errorCount > 1 ? "s" : ""}`);
+      }
+
+      if (successCount > 0) {
+        setMediaForm({ category: "picture" });
+        setShowMediaModal(false);
+        await fetchFiles();
+      }
     } catch (error) {
       console.error("Error uploading media:", error);
       toast.error("Failed to upload media");
+    } finally {
       setUploadingMedia(false);
     }
   };
@@ -1042,9 +1089,11 @@ export default function TripDetails() {
                 <input
                   id="fileInput"
                   type="file"
+                  multiple
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-orange-500"
                 />
+                <p className="text-xs text-gray-600 mt-1">You can select multiple files at once</p>
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -1234,10 +1283,11 @@ export default function TripDetails() {
                   id="mediaInput"
                   type="file"
                   accept="image/*,video/*"
+                  multiple
                   required
                   className="w-full px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <p className="text-xs text-gray-600 mt-2">Supported: JPG, PNG, GIF, MP4, WebM, etc.</p>
+                <p className="text-xs text-gray-600 mt-2">Supported: JPG, PNG, GIF, MP4, WebM, etc. (you can select multiple files)</p>
               </div>
 
               <div className="flex gap-3 pt-4">
