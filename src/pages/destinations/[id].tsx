@@ -22,6 +22,9 @@ interface DestinationData {
     currency: string;
     expenses: any[];
   };
+  isReference?: boolean;
+  referenceId?: string;
+  type?: string;
 }
 
 export default function DestinationDetail() {
@@ -159,6 +162,8 @@ export default function DestinationDetail() {
               activities,
               trip: undefined,
               budget: undefined,
+              isReference,
+              referenceId,
             });
             setFormData({
               name: lookupDestination.name,
@@ -247,11 +252,10 @@ export default function DestinationDetail() {
     setSaving(true);
     try {
       // Check if this is a linked destination (reference)
-      if (data?.destination?.isLinkedByUser) {
+      if (data?.referenceId) {
         // For linked destinations, only update status via reference endpoint
-        await axios.put(`/api/destination-references/${data.destination.referenceId}`, {
+        await axios.put(`/api/destination-references/${data.referenceId}`, {
           status: formData.status,
-          notes: data.destination.notes,
         });
       } else {
         // For owned destinations, allow full editing
@@ -291,10 +295,10 @@ export default function DestinationDetail() {
 
   const handleDelete = async () => {
     // Check if this is a linked destination (reference)
-    if (data?.destination?.isLinkedByUser) {
+    if (data?.referenceId) {
       if (!confirm("Remove this destination from your trip?")) return;
       try {
-        await axios.delete(`/api/destination-references/${data.destination.referenceId}`);
+        await axios.delete(`/api/destination-references/${data.referenceId}`);
         router.back();
       } catch (error) {
         console.error("Error removing destination reference:", error);
@@ -437,7 +441,7 @@ export default function DestinationDetail() {
 
   const { destination, activities, budget } = data;
   const isOwner = session?.user?.email === destination.addedBy;
-  const isReference = destination.isLinkedByUser || data?.destination?.isReference;
+  const isReference = data?.isReference || !!data?.referenceId;
 
   return (
     <div className="min-h-screen bg-gray-50">

@@ -18,6 +18,7 @@ import { toast } from "sonner";
 import { ActivityRecommendations } from "@/components/ActivityRecommendations";
 import { QuickFileLinks } from "@/components/QuickFileLinks";
 import { Topbar } from "@/components/Topbar";
+import { fetchCoordinates } from "@/lib/coordinatesHelper";
 
 export default function Activities({
   initialActivities = [],
@@ -90,8 +91,8 @@ export default function Activities({
     }
   }, [selectedDestination, tripId]);
 
-  // Fetch coordinates from API when location is provided
-  const fetchCoordinates = useCoordinateFetcher((lat, lon) => {
+  // Update coordinates in state when fetched
+  const updateCoordinates = useCoordinateFetcher((lat, lon) => {
     setLatitude(lat);
     setLongitude(lon);
   });
