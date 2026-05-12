@@ -319,6 +319,7 @@ export async function getDestinationsForTrip(
         addedBy: ref.originalCreatorId,
         tripId: tripId,
         urls: [],
+        photos: [], // Empty for references
         public: false, // References are user-specific
         createdAt: ref.createdAt,
         updatedAt: ref.updatedAt,

@@ -37,7 +37,7 @@ export async function fetchCoordinates(
     if (cached) {
       console.log(`[coordinates] Cache hit: ${cached.latitude}, ${cached.longitude}`);
     }
-    return cached;
+    return cached ?? null;
   }
 
   try {

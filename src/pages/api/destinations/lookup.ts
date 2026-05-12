@@ -121,7 +121,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const combinedDestination = {
       ...originalDestination,
       // User-specific status from reference overrides original
-      status: reference.status || originalDestination.status,
+      status: reference.status || originalDestination?.status || "proposed",
       // Include reference metadata
       referenceId: reference.id,
       originalDestinationId: reference.originalItemId,

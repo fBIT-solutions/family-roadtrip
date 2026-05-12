@@ -29,7 +29,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const { id } = req.query;
-  const userEmail = session.user?.email;
+  const userEmail = session?.user?.email || undefined;
 
   if (!id || typeof id !== "string") {
     return res.status(400).json({ error: "Trip ID is required" });

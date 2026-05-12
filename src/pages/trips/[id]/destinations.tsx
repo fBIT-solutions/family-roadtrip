@@ -10,7 +10,12 @@ import { Topbar } from "@/components/Topbar";
 
 interface TripDestinationsData {
   trip: Trip;
-  destinations: Destination[];
+  destinations: DestinationWithReference[];
+}
+
+interface DestinationWithReference extends Destination {
+  isReference?: boolean;
+  referenceId?: string;
 }
 
 interface Recommendation {
@@ -26,7 +31,7 @@ export default function TripDestinations() {
   const router = useRouter();
   const { id } = router.query;
   const [data, setData] = useState<TripDestinationsData | null>(null);
-  const [allDestinations, setAllDestinations] = useState<Destination[]>([]);
+  const [allDestinations, setAllDestinations] = useState<DestinationWithReference[]>([]);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -48,7 +53,7 @@ export default function TripDestinations() {
     longitude: 0,
   });
   const [showEditModal, setShowEditModal] = useState(false);
-  const [editingDestination, setEditingDestination] = useState<Destination | null>(null);
+  const [editingDestination, setEditingDestination] = useState<DestinationWithReference | null>(null);
   const [editFormData, setEditFormData] = useState({
     name: "",
     place: "",
@@ -261,10 +266,9 @@ export default function TripDestinations() {
       const updatedEditFormData = { ...editFormData };
       
       // If this is a reference, only update status and notes via reference endpoint
-      if (editingDestination.isReference) {
-        await axios.put(`/api/destination-references/${editingDestination.id}`, {
+      if (editingDestination.isReference && editingDestination.referenceId) {
+        await axios.put(`/api/destination-references/${editingDestination.referenceId}`, {
           status: updatedEditFormData.status,
-          notes: editingDestination.notes,
         });
       } else {
         // For direct destinations, check if place or country has changed
