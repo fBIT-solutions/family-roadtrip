@@ -43,11 +43,11 @@ export default function Activities({
   const [activities, setActivities] = useState<Activity[]>(initialActivities);
   const [itemReferences, setItemReferences] = useState<ItemReference[]>(initialItemReferences);
   const [destinations, setDestinations] = useState<Destination[]>(initialDestinations);
-  const [selectedDestination, setSelectedDestination] = useState<string>(
-    initialDestinations?.[0]?.id || ""
-  );
   const [activityDestinationFromUrl] = useState<string>(
     typeof queryDestinationId === "string" ? queryDestinationId : ""
+  );
+  const [selectedDestination, setSelectedDestination] = useState<string>(
+    activityDestinationFromUrl || initialDestinations?.[0]?.id || ""
   );
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -583,40 +583,6 @@ export default function Activities({
           </form>
         </div>
 
-            {/* AI Recommendations - Only show when a destination is selected */}
-            {selectedDestination && (
-            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-              <ActivityRecommendations
-                destinationId={selectedDestination}
-                destinationName={getDestinationName(selectedDestination)}
-                budget={50}
-                currency="EUR"
-                onAddActivity={async (activity) => {
-                  try {
-                    const response = await axios.post("/api/activities", {
-                      name: activity.name,
-                      destinationId: selectedDestination,
-                      tripId: tripId || undefined,
-                      description: activity.description || undefined,
-                      location: activity.location || undefined,
-                      latitude: (activity as any).latitude || undefined,
-                      longitude: (activity as any).longitude || undefined,
-                      mainPhotoUrl: activity.mainPhotoUrl || undefined,
-                      category: activity.category,
-                      url: activity.url || undefined,
-                      estimatedCost: activity.estimatedCost,
-                      currency: activity.currency || "EUR",
-                      duration: activity.duration || undefined,
-                    });
-                    setActivities([response.data, ...activities]);
-                  } catch (err) {
-                    console.error("Error adding recommended activity:", err);
-                    throw err;
-                  }
-                }}
-              />
-            </div>
-            )}
         {/* Trip Selector */}
         {availableTrips.length > 0 && (
           <div className="mb-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
@@ -713,6 +679,41 @@ export default function Activities({
             )}
           </div>
         </div>
+
+        {/* AI Recommendations - Only show when a destination is selected */}
+        {selectedDestination && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+            <ActivityRecommendations
+              destinationId={selectedDestination}
+              destinationName={getDestinationName(selectedDestination)}
+              budget={250}
+              currency="EUR"
+              onAddActivity={async (activity) => {
+                try {
+                  const response = await axios.post("/api/activities", {
+                    name: activity.name,
+                    destinationId: selectedDestination,
+                    tripId: tripId || undefined,
+                    description: activity.description || undefined,
+                    location: activity.location || undefined,
+                    latitude: (activity as any).latitude || undefined,
+                    longitude: (activity as any).longitude || undefined,
+                    mainPhotoUrl: activity.mainPhotoUrl || undefined,
+                    category: activity.category,
+                    url: activity.url || undefined,
+                    estimatedCost: activity.estimatedCost,
+                    currency: activity.currency || "EUR",
+                    duration: activity.duration || undefined,
+                  });
+                  setActivities([response.data, ...activities]);
+                } catch (err) {
+                  console.error("Error adding recommended activity:", err);
+                  throw err;
+                }
+              }}
+            />
+          </div>
+        )}
             {/* Activities List */}
             <div className="space-y-4">
               <div className="flex justify-between items-center mb-4">
