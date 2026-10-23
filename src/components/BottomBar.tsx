@@ -7,7 +7,7 @@ import axios from "axios";
 type BottomBarLink = {
   label: string;
   href: string;
-  icon?: string;
+  icon: string;
   count?: number | null;
 };
 
@@ -22,36 +22,36 @@ function getPageLinks(pathname: string, tripId?: string, counts?: { destinations
 
   if (pathname.startsWith("/trips/[id]") && tripId) {
     return [
-      { label: "Trip", href: `/trips/${tripId}` },
-      { label: "Destinations", href: `/trips/${tripId}/destinations` },
-      { label: "Schedule", href: `/trips/${tripId}/schedule` },
-      { label: "Budget", href: `/budgets?tripId=${tripId}` },
+      { label: "Trip", href: `/trips/${tripId}`, icon: "🧭" },
+      { label: "Destinations", href: `/trips/${tripId}/destinations`, icon: "📍" },
+      { label: "Schedule", href: `/trips/${tripId}/schedule`, icon: "📅" },
+      { label: "Budget", href: `/budgets?tripId=${tripId}`, icon: "💰" },
     ];
   }
 
   if (pathname === "/discover") {
     return [
-      { label: "Destinations", href: "/discover#destinations" },
-      { label: "Activities", href: "/discover#activities" },
+      { label: "Destinations", href: "/discover#destinations", icon: "📍" },
+      { label: "Activities", href: "/discover#activities", icon: "🎯" },
     ];
   }
 
   if (pathname === "/destinations") {
     return [
-      { label: "Discover destinations", href: "/discover#destinations" },
-      { label: "Activities", href: "/activities" },
+      { label: "Discover", href: "/discover#destinations", icon: "🔎" },
+      { label: "Activities", href: "/activities", icon: "🎯" },
     ];
   }
 
   if (pathname === "/activities") {
     return [
-      { label: "Discover activities", href: "/discover#activities" },
-      { label: "Destinations", href: "/destinations" },
+      { label: "Discover", href: "/discover#activities", icon: "🔎" },
+      { label: "Destinations", href: "/destinations", icon: "📍" },
     ];
   }
 
   if (pathname === "/budgets") {
-    return [{ label: "Expenses", href: "/expenses" }];
+    return [{ label: "Expenses", href: "/expenses", icon: "💸" }];
   }
 
   return [];
@@ -141,46 +141,32 @@ export function BottomBar() {
             </Link>
           </div>
         ) : (
-          <div className={`flex items-center gap-2 overflow-x-auto py-2 ${isMySpacePage ? "justify-around" : ""}`}>
+          <div className="flex items-center justify-around gap-1 py-2">
             {pageLinks.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={router.asPath === item.href ? "page" : undefined}
-                className={
-                  isMySpacePage
-                    ? "flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100"
-                    : "flex min-h-11 shrink-0 items-center rounded-lg bg-gray-100 px-4 text-sm font-semibold text-gray-700 hover:bg-blue-50 hover:text-blue-700"
-                }
+                className="flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-[10px] font-semibold leading-tight text-gray-700 hover:bg-gray-100 sm:text-xs"
               >
-                {isMySpacePage ? (
-                  <>
-                    <span aria-hidden="true">{item.icon}</span>
-                    <span className="flex items-center gap-1">
-                      {item.label}
-                      {item.count !== undefined && item.count !== null && (
-                        <span className="rounded-full bg-blue-100 px-1.5 text-[10px] leading-4 text-blue-700">
-                          {item.count}
-                        </span>
-                      )}
+                <span aria-hidden="true">{item.icon}</span>
+                <span className="flex items-center gap-1 text-center">
+                  {item.label}
+                  {item.count !== undefined && item.count !== null && (
+                    <span className="rounded-full bg-blue-100 px-1.5 text-[10px] leading-4 text-blue-700">
+                      {item.count}
                     </span>
-                  </>
-                ) : (
-                  item.label
-                )}
+                  )}
+                </span>
               </Link>
             ))}
-            <div className={`relative shrink-0 ${isMySpacePage ? "flex-1" : "ml-auto"}`}>
+            <div className="relative min-w-0 flex-1">
               <button
                 type="button"
                 aria-expanded={menuOpen}
                 aria-haspopup="menu"
                 onClick={() => setMenuOpen((open) => !open)}
-                className={
-                  isMySpacePage
-                    ? "flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100"
-                    : "flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-gray-700 hover:bg-gray-100"
-                }
+                className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-semibold leading-tight text-gray-700 hover:bg-gray-100 sm:text-xs"
               >
                 <span aria-hidden="true">☰</span>
                 <span>Menu</span>

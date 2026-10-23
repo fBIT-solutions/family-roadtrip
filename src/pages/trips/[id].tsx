@@ -534,16 +534,16 @@ export default function TripDetails() {
     <div className="min-h-screen bg-gray-50">
       <Topbar />
       {/* Header */}
-      <div className="bg-white shadow">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-6 sm:py-8">
-          <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-4">
-            <div className="w-full">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800">{trip.name}</h1>
+      <div className="border-b border-blue-100 bg-gradient-to-br from-white via-white to-blue-50 shadow-sm">
+        <div className="mx-auto max-w-7xl px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
+          <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
+              <h1 className="break-words text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl lg:text-4xl">{trip.name}</h1>
               <p className="text-gray-600 mt-2">{trip.description}</p>
-              <div className="flex flex-wrap gap-2 sm:gap-4 mt-4 text-xs sm:text-sm text-gray-700">
-                <span>📅 {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}</span>
-                <span>⏱️ {trip.days}d</span>
-                <span>🎯 {trip.goal}</span>
+              <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-gray-700 sm:gap-3 sm:text-sm">
+                <span className="rounded-full bg-white/80 px-3 py-1.5">📅 {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}</span>
+                <span className="rounded-full bg-white/80 px-3 py-1.5">⏱️ {trip.days}d</span>
+                <span className="rounded-full bg-white/80 px-3 py-1.5">🎯 {trip.goal}</span>
                 <span className={`px-2 py-1 rounded font-semibold ${trip.status === "planning" ? "bg-yellow-100 text-yellow-800" :
                     trip.status === "active" ? "bg-green-100 text-green-800" :
                       trip.status === "completed" ? "bg-blue-100 text-blue-800" :
@@ -553,38 +553,38 @@ export default function TripDetails() {
                 </span>
               </div>
             </div>
-            <div className="flex gap-2 flex-col sm:flex-row w-full sm:w-auto">
-              <Link href="/" className="w-full sm:w-auto">
-                <button className="w-full px-3 py-2 text-sm sm:text-base bg-gray-300 rounded hover:bg-gray-400 whitespace-nowrap">← Back</button>
+            <div className="grid w-full grid-cols-3 gap-2 sm:w-auto sm:flex">
+              <Link href="/" className="min-w-0">
+                <button className="w-full rounded-lg bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50 whitespace-nowrap">← Back</button>
               </Link>
               {userRole !== "reader" && (
                 <button
                   onClick={() => setShowEditModal(true)}
-                  className="w-full sm:w-auto px-3 py-2 text-sm sm:text-base bg-blue-600 text-white rounded hover:bg-blue-700 whitespace-nowrap">
+                  className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 whitespace-nowrap">
                   ✏️ Edit
                 </button>
               )}
               {tripData?.trip.createdBy === session?.user?.email && (
                 <button
                   onClick={() => setShowTravelerRequestsModal(true)}
-                  className="w-full sm:w-auto px-3 py-2 text-sm sm:text-base bg-purple-600 text-white rounded hover:bg-purple-700 whitespace-nowrap">
+                  className="rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white shadow-sm hover:bg-purple-700 whitespace-nowrap">
                   📋 Requests
                 </button>
               )}
             </div>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:flex lg:gap-2 lg:flex-wrap gap-2 mt-4">
+          <div className="grid grid-cols-3 gap-2 border-t border-blue-100 pt-4 sm:flex sm:flex-wrap">
             {userRole !== "reader" && (
               <button
                 onClick={() => setShowFileModal(true)}
-                className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-orange-600 text-white rounded hover:bg-orange-700">
+                className="rounded-lg bg-orange-600 px-2 py-2.5 text-xs font-medium text-white shadow-sm hover:bg-orange-700 sm:px-4 sm:text-sm">
                 📎 Files
               </button>
             )}
             <button
               onClick={() => setShowMediaModal(true)}
               disabled={userRole === "reader"}
-              className={`px-2 py-2 text-xs sm:text-sm sm:px-4 rounded ${userRole === "reader"
+              className={`rounded-lg px-2 py-2.5 text-xs font-medium shadow-sm sm:px-4 sm:text-sm ${userRole === "reader"
                   ? "bg-gray-400 text-gray-600 cursor-not-allowed"
                   : "bg-pink-600 text-white hover:bg-pink-700"
                 }`}
@@ -595,14 +595,14 @@ export default function TripDetails() {
             {userRole !== "reader" && (
               <button
                 onClick={() => setShowExpenseModal(true)}
-                className="px-2 py-2 text-xs sm:text-sm sm:px-4 bg-green-600 text-white rounded hover:bg-green-700">
+                className="rounded-lg bg-green-600 px-2 py-2.5 text-xs font-medium text-white shadow-sm hover:bg-green-700 sm:px-4 sm:text-sm">
                 💰 Expense
               </button>
             )}
-            <Link href={`/trips/${trip.id}/destinations`} className="col-span-1">
+            <Link href={`/trips/${trip.id}/destinations`} className="min-w-0">
               <button
                 disabled={userRole === "reader"}
-                className={`w-full px-2 py-2 text-xs sm:text-sm sm:px-4 rounded ${userRole === "reader"
+                className={`w-full rounded-lg px-2 py-2.5 text-xs font-medium shadow-sm sm:px-4 sm:text-sm ${userRole === "reader"
                     ? "bg-gray-400 text-gray-600 cursor-not-allowed"
                     : "bg-blue-600 text-white hover:bg-blue-700"
                   }`}
@@ -617,7 +617,7 @@ export default function TripDetails() {
                 setShowAddActivityModal(true);
               }}
               disabled={userRole === "reader"}
-              className={`px-2 py-2 text-xs sm:text-sm sm:px-4 rounded ${userRole === "reader"
+              className={`rounded-lg px-2 py-2.5 text-xs font-medium shadow-sm sm:px-4 sm:text-sm ${userRole === "reader"
                   ? "bg-gray-400 text-gray-600 cursor-not-allowed"
                   : "bg-purple-600 text-white hover:bg-purple-700"
                 }`}
@@ -629,37 +629,37 @@ export default function TripDetails() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mx-auto max-w-7xl px-3 py-5 sm:px-6 sm:py-8 lg:px-8">
         {/* Trip Details */}
         <div className="mb-8">
-          <div className="border-2 border-gray-200 rounded-lg p-6 bg-white">
-            <h2 className="text-2xl font-bold text-gray-800 mb-4">TRIP DETAILS</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
+          <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm sm:p-6">
+            <h2 className="mb-4 text-lg font-bold tracking-wide text-gray-800 sm:text-xl">TRIP DETAILS</h2>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
               <div>
                 <p className="text-gray-600 text-sm">Duration</p>
-                <p className="text-xl font-semibold text-gray-800">{trip.days} days</p>
+                <p className="text-lg font-semibold text-gray-800 sm:text-xl">{trip.days} days</p>
               </div>
               <div>
                 <p className="text-gray-600 text-sm">Travelers</p>
-                <p className="text-xl font-semibold text-gray-800">{trip.people.length}</p>
+                <p className="text-lg font-semibold text-gray-800 sm:text-xl">{trip.people.length}</p>
               </div>
               <div>
                 <p className="text-gray-600 text-sm">Pet</p>
-                <p className="text-xl font-semibold text-gray-800">{trip.hasPet ? "Yes 🐾" : "No"}</p>
+                <p className="text-lg font-semibold text-gray-800 sm:text-xl">{trip.hasPet ? "Yes 🐾" : "No"}</p>
               </div>
               <div>
                 <p className="text-gray-600 text-sm">Budget</p>
-                <p className="text-xl font-semibold text-gray-800">{trip.currency} {trip.totalBudget.toLocaleString()}</p>
+                <p className="text-lg font-semibold text-gray-800 sm:text-xl">{trip.currency} {trip.totalBudget.toLocaleString()}</p>
               </div>
             </div>
           </div>
         </div>
 
         {/* Main Grid Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
+        <div className="mb-8 grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
           {/* Trip Schedule */}
-          <div className="bg-white rounded-lg shadow p-6 border-t-4 border-orange-500">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">📅 TRIP SCHEDULE</h3>
+          <div className="rounded-2xl border-t-4 border-orange-500 bg-white p-4 shadow-sm sm:p-6">
+            <h3 className="mb-4 text-lg font-bold text-gray-800 sm:text-xl">📅 TRIP SCHEDULE</h3>
             <div className="overflow-y-auto max-h-96">
               <Timeline
                 events={events}
@@ -677,8 +677,8 @@ export default function TripDetails() {
 
           {/* Budget */}
           {userRole !== "reader" ? (
-            <div className="bg-white rounded-lg shadow p-6 border-t-4 border-green-500">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">💰 BUDGET</h3>
+            <div className="rounded-2xl border-t-4 border-green-500 bg-white p-4 shadow-sm sm:p-6">
+              <h3 className="mb-4 text-lg font-bold text-gray-800 sm:text-xl">💰 BUDGET</h3>
               <div className="space-y-4">
                 <div>
                   <p className="text-sm text-gray-600 mb-2">Total Budget</p>
@@ -711,8 +711,8 @@ export default function TripDetails() {
               </Link>
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow p-6 border-t-4 border-gray-300">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">💰 BUDGET</h3>
+            <div className="rounded-2xl border-t-4 border-gray-300 bg-white p-4 shadow-sm sm:p-6">
+              <h3 className="mb-4 text-lg font-bold text-gray-800 sm:text-xl">💰 BUDGET</h3>
               <div className="flex items-center justify-center py-8">
                 <p className="text-gray-500 text-center">You don't have permission to view this content</p>
               </div>
@@ -721,8 +721,8 @@ export default function TripDetails() {
 
           {/* Trip Feed */}
           {userRole !== "reader" ? (
-            <div className="bg-white rounded-lg shadow p-6 border-t-4 border-purple-500">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">💬 TRIP FEED</h3>
+            <div className="rounded-2xl border-t-4 border-purple-500 bg-white p-4 shadow-sm sm:p-6">
+              <h3 className="mb-4 text-lg font-bold text-gray-800 sm:text-xl">💬 TRIP FEED</h3>
               <div className="bg-purple-50 rounded p-3 text-center">
                 <p className="text-gray-600 text-sm">Post messages and updates about your trip</p>
               </div>
@@ -758,8 +758,8 @@ export default function TripDetails() {
               </button>
             </div>
           ) : (
-            <div className="bg-white rounded-lg shadow p-6 border-t-4 border-gray-300">
-              <h3 className="text-xl font-bold text-gray-800 mb-4">💬 TRIP FEED</h3>
+            <div className="rounded-2xl border-t-4 border-gray-300 bg-white p-4 shadow-sm sm:p-6">
+              <h3 className="mb-4 text-lg font-bold text-gray-800 sm:text-xl">💬 TRIP FEED</h3>
               <div className="flex items-center justify-center py-8">
                 <p className="text-gray-500 text-center">You don't have permission to view this content</p>
               </div>
@@ -768,8 +768,8 @@ export default function TripDetails() {
         </div>
 
         {/* Trip Media Section */}
-        <div className="bg-white rounded-lg shadow p-6 border-t-4 border-pink-500 mb-8">
-          <h3 className="text-2xl font-bold text-gray-800 mb-6">📸 TRIP MEDIA</h3>
+        <div className="mb-8 rounded-2xl border-t-4 border-pink-500 bg-white p-4 shadow-sm sm:p-6">
+          <h3 className="mb-5 text-xl font-bold text-gray-800 sm:text-2xl">📸 TRIP MEDIA</h3>
           <MediaGallery
             files={tripFiles}
             onUploadClick={userRole === "reader" ? undefined : () => setShowMediaModal(true)}
@@ -778,14 +778,14 @@ export default function TripDetails() {
 
         {/* Destinations Detailed List */}
         {destinations.length > 0 && (
-          <div className="bg-white rounded-lg shadow p-6 border-t-4 border-blue-500 mb-8">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-2xl font-bold text-gray-800">🌍 TRIP DESTINATIONS</h3>
-              <div className="flex items-center gap-3">
-                <div className="flex gap-2">
+          <div className="mb-8 rounded-2xl border-t-4 border-blue-500 bg-white p-4 shadow-sm sm:p-6">
+            <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <h3 className="text-xl font-bold text-gray-800 sm:text-2xl">🌍 TRIP DESTINATIONS</h3>
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                <div className="flex shrink-0 gap-2">
                   <button
                     onClick={() => setDestinationViewMode("list")}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${destinationViewMode === "list"
+                    className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${destinationViewMode === "list"
                         ? "bg-blue-500 text-white"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                       }`}
@@ -794,7 +794,7 @@ export default function TripDetails() {
                   </button>
                   <button
                     onClick={() => setDestinationViewMode("map")}
-                    className={`px-4 py-2 rounded-lg font-medium transition-colors ${destinationViewMode === "map"
+                    className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors sm:px-4 ${destinationViewMode === "map"
                         ? "bg-blue-500 text-white"
                         : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                       }`}
@@ -805,7 +805,7 @@ export default function TripDetails() {
                 <select
                   value={destinationFilter}
                   onChange={(e) => setDestinationFilter(e.target.value as any)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="min-w-0 flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 sm:flex-none"
                 >
                   <option value="all">All Destinations</option>
                   {DESTINATION_STATUSES.map((status) => (
@@ -842,13 +842,13 @@ export default function TripDetails() {
         )}
 
         {/* Files Section */}
-        <div className="bg-white rounded-lg shadow p-6 border-t-4 border-orange-500">
-          <div className="flex items-center justify-between mb-6">
-            <h3 className="text-2xl font-bold text-gray-800">📄 TRIP DOCUMENTS</h3>
+        <div className="rounded-2xl border-t-4 border-orange-500 bg-white p-4 shadow-sm sm:p-6">
+          <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <h3 className="text-xl font-bold text-gray-800 sm:text-2xl">📄 TRIP DOCUMENTS</h3>
             <select
               value={documentFilter}
               onChange={(e) => setDocumentFilter(e.target.value as any)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+              className="w-full min-w-0 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 sm:w-auto"
             >
               <option value="all">All Documents</option>
               <option value="document">Documents</option>
