@@ -5,6 +5,7 @@ import axios from "axios";
 import Link from "next/link";
 import { Trip, TimelineEvent, Activity } from "@/types/schema";
 import { toast } from "sonner";
+import { formatDate } from "@/lib/formatDate";
 import { Topbar } from "@/components/Topbar";
 
 interface TripData {
@@ -574,22 +575,7 @@ export default function TripSchedule() {
         {/* Events Display */}
         {filteredEvents.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-12 text-center">
-            <p className="text-gray-600 mb-4">No events scheduled yet.</p>
-            <button
-              onClick={() => {
-                resetForm();
-                setShowAddModal(true);
-              }}
-              disabled={isGuest}
-              className={`px-6 py-2 rounded font-semibold ${
-                isGuest
-                  ? "bg-gray-400 text-gray-600 cursor-not-allowed"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
-              }`}
-              title={isGuest ? "Guests cannot create events" : ""}
-            >
-              Create First Event
-            </button>
+            <p className="text-gray-600">No events scheduled yet. Use “+ Add Event” above to plan the first one.</p>
           </div>
         ) : viewMode === "list" ? (
           // List View
@@ -597,7 +583,7 @@ export default function TripSchedule() {
             {Object.entries(groupedByDate).map(([date, dateEvents]) => (
               <div key={date}>
                 <h3 className="text-sm font-bold text-gray-600 mb-3 px-4 py-2 bg-gray-200 rounded">
-                  {new Date(date).toLocaleDateString("en-US", {
+                  {formatDate(date, {
                     weekday: "long",
                     year: "numeric",
                     month: "long",
@@ -650,7 +636,7 @@ export default function TripSchedule() {
                           )}
                           <p className="text-xs text-gray-600">
                             By {event.createdBy} •{" "}
-                            {new Date(event.createdAt).toLocaleDateString()}
+                            {formatDate(event.createdAt)}
                           </p>
                         </div>
                         <div className="flex gap-2 flex-col sm:flex-row">
@@ -715,7 +701,7 @@ export default function TripSchedule() {
                     {eventTypeColors[event.type].icon}
                   </span>
                   <span className="text-xs font-bold text-gray-600">
-                    {new Date(event.date).toLocaleDateString("en-US", {
+                    {formatDate(event.date, {
                       month: "short",
                       day: "numeric",
                     })}

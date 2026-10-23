@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { TravelerRequest } from "@/types/schema";
+import { formatDate } from "@/lib/formatDate";
 
 interface TravelerRequestsModalProps {
   tripId: string;
@@ -141,7 +142,7 @@ export function TravelerRequestsModal({
                           </p>
                         </div>
                         <span className="text-xs text-gray-600">
-                          {new Date(request.createdAt).toLocaleDateString()}
+                          {formatDate(request.createdAt)}
                         </span>
                       </div>
 

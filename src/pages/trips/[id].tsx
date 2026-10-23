@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Trip, Destination, FileMetadata, Expense, Activity, TimelineEvent } from "@/types/schema";
 import Link from "next/link";
 import { Topbar } from "@/components/Topbar";
+import { formatDate } from "@/lib/formatDate";
 import { FilesList } from "@/components/FilesList";
 import { MediaGallery } from "@/components/MediaGallery";
 import { DestinationCardRow } from "@/components/DestinationCardRow";
@@ -541,7 +542,7 @@ export default function TripDetails() {
               <h1 className="break-words text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl lg:text-4xl">{trip.name}</h1>
               <p className="text-gray-600 mt-2">{trip.description}</p>
               <div className="mt-4 flex flex-wrap items-center gap-2 text-xs text-gray-700 sm:gap-3 sm:text-sm">
-                <span className="rounded-full bg-white/80 px-3 py-1.5">📅 {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}</span>
+                <span className="rounded-full bg-white/80 px-3 py-1.5">📅 {formatDate(trip.startDate)} - {formatDate(trip.endDate)}</span>
                 <span className="rounded-full bg-white/80 px-3 py-1.5">⏱️ {trip.days}d</span>
                 <span className="rounded-full bg-white/80 px-3 py-1.5">🎯 {trip.goal}</span>
                 <span className={`px-2 py-1 rounded font-semibold ${trip.status === "planning" ? "bg-yellow-100 text-yellow-800" :
@@ -715,7 +716,7 @@ export default function TripDetails() {
                           <p className="font-semibold text-gray-800 text-sm">{post.author}</p>
                           <p className="text-gray-700 text-sm mt-1">{post.content}</p>
                           <p className="text-xs text-gray-500 mt-2">
-                            {new Date(post.createdAt).toLocaleDateString("en-US", {
+                            {formatDate(post.createdAt, {
                               month: "short",
                               day: "numeric",
                               hour: "2-digit",

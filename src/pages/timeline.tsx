@@ -3,6 +3,7 @@ import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import axios from "axios";
 import { TimelineEvent } from "@/types/schema";
+import { formatDate } from "@/lib/formatDate";
 
 export default function Timeline() {
   const { data: session, status } = useSession();
@@ -177,11 +178,11 @@ export default function Timeline() {
                             {event.title}
                           </h3>
                           <p className="text-sm text-gray-500">
-                            {new Date(event.date).toLocaleDateString('en-US', { 
-                              weekday: 'long', 
-                              year: 'numeric', 
-                              month: 'long', 
-                              day: 'numeric' 
+                            {formatDate(event.date, {
+                              weekday: "long",
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
                             })}
                           </p>
                           <span className="inline-block mt-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">

@@ -68,9 +68,10 @@ export function BottomBar() {
   });
   const isHomePage = router.pathname === "/";
   const isMySpacePage = router.pathname === "/my-space";
+  const tripId = typeof router.query.id === "string" ? router.query.id : undefined;
   const pageLinks = getPageLinks(
     router.pathname,
-    typeof router.query.id === "string" ? router.query.id : undefined,
+    tripId,
     mySpaceCounts
   );
 
@@ -236,11 +237,15 @@ export function BottomBar() {
             </Link>
             <Link
               role="menuitem"
-              href="/?create=destination"
+              href={
+                tripId && router.pathname.startsWith("/trips/[id]")
+                  ? `/trips/${tripId}/destinations?create=destination`
+                  : "/?create=destination"
+              }
               onClick={() => setMenuOpen(false)}
               className="block rounded-lg px-4 py-3 text-sm text-gray-800 hover:bg-blue-50"
             >
-              📍 Create destination
+              📍 {tripId && router.pathname.startsWith("/trips/[id]") ? "Create destination for this trip" : "Create destination"}
             </Link>
             <Link
               role="menuitem"

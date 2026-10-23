@@ -9,6 +9,7 @@ import { Expense, Destination } from "@/types/schema";
 import { EXPENSE_CATEGORY_COLORS, getExpenseCategoryColor } from "@/lib/constants";
 import * as expenseApi from "@/api/expenses";
 import * as destinationApi from "@/api/destinations";
+import { formatDate } from "@/lib/formatDate";
 
 export default function Expenses({
   initialExpenses = [],
@@ -384,7 +385,7 @@ export default function Expenses({
                   {expenses.map((expense) => (
                     <tr key={expense.id} className="border-b border-gray-200 hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {new Date(expense.date).toLocaleDateString()}
+                        {formatDate(expense.date)}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         <div>

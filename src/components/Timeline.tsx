@@ -1,6 +1,7 @@
 import React from "react";
 import { TimelineEvent } from "@/types/schema";
 import Link from "next/link";
+import { formatDate as formatUiDate } from "@/lib/formatDate";
 
 interface TimelineProps {
   events: TimelineEvent[];
@@ -77,7 +78,7 @@ export function Timeline({ events, tripStartDate, tripEndDate, tripId }: Timelin
   const sortedEntries = expandedEntries.sort((a, b) => a.date.getTime() - b.date.getTime());
 
   const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString("en-US", {
+    return formatUiDate(date, {
       month: "short",
       day: "numeric",
     });
