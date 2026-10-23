@@ -1,5 +1,5 @@
 import React from "react";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
 
 export function Topbar() {
@@ -15,27 +15,7 @@ export function Topbar() {
             </Link>
           </div>
           <div className="flex max-w-full flex-wrap items-center justify-end gap-2 sm:gap-4">
-            {session ? (
-              <>
-                <span className="text-xs sm:text-sm text-gray-700 hidden sm:block">Welcome, {session.user?.name}</span>
-                <Link href="/my-space">
-                  <button className="px-2 sm:px-4 py-2 text-xs sm:text-sm bg-purple-600 text-white rounded hover:bg-purple-700">
-                    🏠 My Space
-                  </button>
-                </Link>
-                <Link href="/requests">
-                  <button className="px-2 sm:px-4 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
-                    📋 Requests
-                  </button>
-                </Link>
-                <button
-                  onClick={() => signOut()}
-                  className="px-2 sm:px-4 py-2 text-xs sm:text-sm bg-red-500 text-white rounded hover:bg-red-600"
-                >
-                  Sign Out
-                </button>
-              </>
-            ) : (
+            {!session && (
               <button
                 onClick={() => signIn()}
                 className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
