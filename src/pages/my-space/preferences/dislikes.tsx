@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import Link from "next/link";
 import { RecommendationDislike } from "@/types/schema";
 import { Topbar } from "@/components/Topbar";
+import { formatDate } from "@/lib/formatDate";
 
 export default function DislikesPage() {
   const { data: session, status } = useSession();
@@ -211,7 +212,7 @@ export default function DislikesPage() {
                       )}
 
                       <p className="text-xs text-gray-500 mt-2">
-                        {new Date(dislike.createdAt).toLocaleDateString()}
+                        {formatDate(dislike.createdAt)}
                       </p>
                     </div>
 

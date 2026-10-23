@@ -3,6 +3,7 @@ import { useSession, signIn } from "next-auth/react";
 import Link from "next/link";
 import axios from "axios";
 import { Reservation } from "@/types/schema";
+import { formatDate } from "@/lib/formatDate";
 
 export default function Reservations() {
   const { data: session, status } = useSession();
@@ -186,8 +187,8 @@ export default function Reservations() {
                       <h3 className="text-xl font-bold text-gray-800">{res.title}</h3>
                       <p className="text-gray-600">{res.location} · {res.type}</p>
                       <p className="text-sm text-gray-500">
-                        {new Date(res.startDate).toLocaleDateString()} 
-                        {res.endDate && ` - ${new Date(res.endDate).toLocaleDateString()}`}
+                        {formatDate(res.startDate)}
+                        {res.endDate && ` - ${formatDate(res.endDate)}`}
                       </p>
                       {res.confirmationNumber && (
                         <p className="text-sm text-gray-500">Confirmation: {res.confirmationNumber}</p>

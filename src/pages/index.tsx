@@ -5,6 +5,7 @@ import Link from "next/link";
 import axios from "axios";
 import { Trip, Destination } from "@/types/schema";
 import { TRIP_GOALS } from "@/lib/constants";
+import { formatDate } from "@/lib/formatDate";
 import { Topbar } from "@/components/Topbar";
 
 export default function Home() {
@@ -341,12 +342,15 @@ export default function Home() {
                 return (
                   <div
                     key={trip.id}
-                    onClick={() => router.push(`/trips/${trip.id}`)}
-                    className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition cursor-pointer border-l-4 border-blue-500"
+                    className="bg-white p-6 rounded-lg shadow hover:shadow-lg transition border-l-4 border-blue-500"
                   >
                     <div className="flex justify-between items-start mb-3">
                       <div>
-                        <h3 className="text-xl font-bold text-gray-800">{trip.name}</h3>
+                        <h3 className="text-xl font-bold text-gray-800">
+                          <Link href={`/trips/${trip.id}`} className="rounded-sm hover:text-blue-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-blue-600">
+                            {trip.name}
+                          </Link>
+                        </h3>
                         <div className="flex gap-2 mt-2">
                           <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded capitalize">
                             {trip.goal}
@@ -369,7 +373,7 @@ export default function Home() {
                     <p className="text-gray-600 text-sm mb-3">{trip.description}</p>
 
                     <div className="space-y-2 text-sm text-gray-700 mb-4">
-                      <div>📅 {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}</div>
+                      <div>📅 {formatDate(trip.startDate)} - {formatDate(trip.endDate)}</div>
                       <div>⏱️  {trip.days} days</div>
                       <div>👥 {trip.people.length} person{trip.people.length !== 1 ? "s" : ""} {trip.hasPet && "🐾"}</div>
                       <div>💰 {trip.currency} {trip.totalBudget.toLocaleString()}</div>
@@ -391,7 +395,12 @@ export default function Home() {
 
           {/* Discover Public Destinations Section */}
           <div className="mt-16">
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-8">Discover Public Destinations</h2>
+            <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">Discover Public Destinations</h2>
+              <Link href="/discover#destinations" className="rounded-lg px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-50">
+                Browse all destinations
+              </Link>
+            </div>
             {publicDestinationsLoading ? (
               <div className="text-center text-gray-600">Loading destinations...</div>
             ) : publicDestinations.length === 0 ? (
@@ -400,7 +409,7 @@ export default function Home() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {publicDestinations.map((destination) => (
+                {publicDestinations.slice(0, 3).map((destination) => (
                   <div
                     key={destination.id}
                     className="bg-white rounded-lg shadow hover:shadow-lg transition overflow-hidden"
@@ -838,7 +847,7 @@ export default function Home() {
                           <div className="ml-4">
                             <p className="font-semibold text-gray-800">{trip.name}</p>
                             <p className="text-sm text-gray-600">
-                              {new Date(trip.startDate).toLocaleDateString()} - {new Date(trip.endDate).toLocaleDateString()}
+                              {formatDate(trip.startDate)} - {formatDate(trip.endDate)}
                             </p>
                           </div>
                         </label>

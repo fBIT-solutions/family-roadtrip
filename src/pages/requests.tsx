@@ -5,6 +5,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { TravelerRequest, Trip } from "@/types/schema";
 import Link from "next/link";
+import { formatDate } from "@/lib/formatDate";
 
 export default function RequestsPage() {
   const router = useRouter();
@@ -149,7 +150,7 @@ export default function RequestsPage() {
                     <div>
                       <p className="text-gray-600">Requested</p>
                       <p className="font-semibold text-gray-800">
-                        {new Date(request.createdAt).toLocaleDateString()}
+                        {formatDate(request.createdAt)}
                       </p>
                     </div>
                     <div>

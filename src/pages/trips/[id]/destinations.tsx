@@ -39,6 +39,7 @@ export default function TripDestinations() {
   const [loadingRecommendations, setLoadingRecommendations] = useState(false);
   const [showRecommendations, setShowRecommendations] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "map">("list");
+  const [expandedDescriptions, setExpandedDescriptions] = useState<Set<string>>(new Set());
   const [showLinkModal, setShowLinkModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [formData, setFormData] = useState({
@@ -66,6 +67,15 @@ export default function TripDestinations() {
     latitude: 0,
     longitude: 0,
   });
+
+  useEffect(() => {
+    if (!router.isReady || !id || router.query.create !== "destination") return;
+
+    setShowAddModal(true);
+    setShowRecommendations(false);
+    setRecommendations([]);
+    void router.replace(`/trips/${id}/destinations`, undefined, { shallow: true });
+  }, [id, router.isReady, router.query.create, router.replace]);
 
   useEffect(() => {
     if (!id) return;
@@ -430,7 +440,31 @@ export default function TripDestinations() {
                   </div>
 
                   {dest.description && (
-                    <p className="text-gray-600 text-sm mb-3">{dest.description}</p>
+                    <div className="mb-3">
+                      <p className="text-gray-600 text-sm">
+                        {expandedDescriptions.has(dest.id) || dest.description.length <= 180
+                          ? dest.description
+                          : `${dest.description.slice(0, 180).trimEnd()}…`}
+                      </p>
+                      {dest.description.length > 180 && (
+                        <button
+                          type="button"
+                          aria-expanded={expandedDescriptions.has(dest.id)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setExpandedDescriptions((current) => {
+                              const next = new Set(current);
+                              if (next.has(dest.id)) next.delete(dest.id);
+                              else next.add(dest.id);
+                              return next;
+                            });
+                          }}
+                          className="mt-1 text-sm font-medium text-blue-700 hover:underline"
+                        >
+                          {expandedDescriptions.has(dest.id) ? "Show less" : "Read more"}
+                        </button>
+                      )}
+                    </div>
                   )}
 
                   <div className="space-y-2 text-sm text-gray-700 mb-4">
