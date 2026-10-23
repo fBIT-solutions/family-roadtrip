@@ -52,6 +52,18 @@ export default function Home() {
   const [selectedTripForDestination, setSelectedTripForDestination] = useState<string>("");
 
   useEffect(() => {
+    if (!router.isReady || !session) return;
+
+    const createType = router.query.create;
+    if (createType === "trip") setShowCreateModal(true);
+    if (createType === "destination") setShowAddDestinationModal(true);
+
+    if (createType === "trip" || createType === "destination") {
+      void router.replace("/", undefined, { shallow: true });
+    }
+  }, [router.isReady, router.query.create, session]);
+
+  useEffect(() => {
     if (session) {
       fetchTrips();
       fetchPublicDestinations();
@@ -289,28 +301,8 @@ export default function Home() {
 
       {session ? (
         <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-8 sm:py-12">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+          <div className="mb-8">
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-800">My Trips</h2>
-            <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
-              <button
-                onClick={() => setShowAddDestinationModal(true)}
-                className="flex-1 sm:flex-initial px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-base bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-semibold"
-              >
-                + Destination
-              </button>
-              <button
-                onClick={() => setShowAddActivityModal(true)}
-                className="flex-1 sm:flex-initial px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-base bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition font-semibold"
-              >
-                + Activity
-              </button>
-              <button
-                onClick={() => setShowCreateModal(true)}
-                className="flex-1 sm:flex-initial px-3 sm:px-6 py-2 sm:py-3 text-xs sm:text-base bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
-              >
-                + Trip
-              </button>
-            </div>
           </div>
 
           {loading ? (

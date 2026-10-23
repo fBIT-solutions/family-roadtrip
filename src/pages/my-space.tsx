@@ -198,51 +198,6 @@ export default function MySpace() {
               </div>
             </div>
 
-            {/* Navigation Tabs */}
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <nav className="divide-y divide-gray-200">
-                <button
-                  onClick={() => setActiveTab("overview")}
-                  className={`w-full text-left px-4 py-3 font-medium transition ${
-                    activeTab === "overview"
-                      ? "bg-blue-50 text-blue-700 border-l-4 border-blue-700"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  📊 Overview
-                </button>
-                <button
-                  onClick={() => setActiveTab("destinations")}
-                  className={`w-full text-left px-4 py-3 font-medium transition ${
-                    activeTab === "destinations"
-                      ? "bg-blue-50 text-blue-700 border-l-4 border-blue-700"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  📍 Destinations ({myDestinations.length})
-                </button>
-                <button
-                  onClick={() => setActiveTab("activities")}
-                  className={`w-full text-left px-4 py-3 font-medium transition ${
-                    activeTab === "activities"
-                      ? "bg-blue-50 text-blue-700 border-l-4 border-blue-700"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  🎯 Activities ({myActivities.length})
-                </button>
-                <button
-                  onClick={() => setActiveTab("preferences")}
-                  className={`w-full text-left px-4 py-3 font-medium transition ${
-                    activeTab === "preferences"
-                      ? "bg-blue-50 text-blue-700 border-l-4 border-blue-700"
-                      : "text-gray-700 hover:bg-gray-50"
-                  }`}
-                >
-                  ⚙️ Preferences
-                </button>
-              </nav>
-            </div>
           </div>
 
           {/* Main Content */}
@@ -593,4 +548,3 @@ export default function MySpace() {
     </div>
   );
 }
-
