@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import Link from "next/link";
 import { useRouter } from "next/router";
 import axios from "axios";
@@ -61,6 +61,7 @@ export function BottomBar() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [mySpaceCounts, setMySpaceCounts] = useState<{ destinations: number | null; activities: number | null }>({
     destinations: null,
     activities: null,
@@ -74,7 +75,10 @@ export function BottomBar() {
   );
 
   useEffect(() => {
-    const closeMenu = () => setMenuOpen(false);
+    const closeMenu = () => {
+      setMenuOpen(false);
+      setAccountMenuOpen(false);
+    };
     router.events.on("routeChangeStart", closeMenu);
     return () => router.events.off("routeChangeStart", closeMenu);
   }, [router.events]);
@@ -107,6 +111,13 @@ export function BottomBar() {
 
   if (status !== "authenticated") return null;
 
+  const initials = (session?.user?.name || session?.user?.email || "U")
+    .split(/[\s@._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join("");
+
   return (
     <nav
       aria-label="Main navigation"
@@ -115,13 +126,6 @@ export function BottomBar() {
       <div className="mx-auto max-w-7xl px-3 sm:px-6 lg:px-8">
         {isHomePage ? (
           <div className="grid grid-cols-3 items-center gap-2 py-2">
-            <Link
-              href="/my-space"
-              className="flex min-h-11 flex-col items-center justify-center rounded-lg text-xs font-semibold text-gray-700 hover:bg-gray-100"
-            >
-              <span aria-hidden="true">🏠</span>
-              <span>My Space</span>
-            </Link>
             <button
               type="button"
               aria-expanded={menuOpen}
@@ -139,9 +143,35 @@ export function BottomBar() {
               <span aria-hidden="true">🔎</span>
               <span>Discover</span>
             </Link>
+            <button
+              type="button"
+              aria-label="Account menu"
+              aria-expanded={accountMenuOpen}
+              aria-haspopup="menu"
+              onClick={() => setAccountMenuOpen((open) => !open)}
+              className="mx-auto flex h-10 w-10 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-sm font-bold text-blue-700 ring-1 ring-blue-200 hover:ring-blue-400"
+            >
+              {session.user?.image ? (
+                <img src={session.user.image} alt="" className="h-full w-full object-cover" />
+              ) : (
+                initials
+              )}
+            </button>
           </div>
         ) : (
           <div className="flex items-center justify-around gap-1 py-2">
+            <div className="relative min-w-0 flex-1">
+              <button
+                type="button"
+                aria-expanded={menuOpen}
+                aria-haspopup="menu"
+                onClick={() => setMenuOpen((open) => !open)}
+                className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-semibold leading-tight text-gray-700 hover:bg-gray-100 sm:text-xs"
+              >
+                <span aria-hidden="true">☰</span>
+                <span>Menu</span>
+              </button>
+            </div>
             {pageLinks.map((item) => (
               <Link
                 key={item.href}
@@ -160,18 +190,20 @@ export function BottomBar() {
                 </span>
               </Link>
             ))}
-            <div className="relative min-w-0 flex-1">
-              <button
-                type="button"
-                aria-expanded={menuOpen}
-                aria-haspopup="menu"
-                onClick={() => setMenuOpen((open) => !open)}
-                className="flex min-h-11 w-full flex-col items-center justify-center gap-0.5 rounded-lg text-[10px] font-semibold leading-tight text-gray-700 hover:bg-gray-100 sm:text-xs"
-              >
-                <span aria-hidden="true">☰</span>
-                <span>Menu</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              aria-label="Account menu"
+              aria-expanded={accountMenuOpen}
+              aria-haspopup="menu"
+              onClick={() => setAccountMenuOpen((open) => !open)}
+              className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-xs font-bold text-blue-700 ring-1 ring-blue-200 hover:ring-blue-400"
+            >
+              {session.user?.image ? (
+                <img src={session.user.image} alt="" className="h-full w-full object-cover" />
+              ) : (
+                initials
+              )}
+            </button>
           </div>
         )}
 
@@ -183,14 +215,6 @@ export function BottomBar() {
           >
             {!isHomePage && (
               <>
-                <Link
-                  role="menuitem"
-                  href="/my-space"
-                  onClick={() => setMenuOpen(false)}
-                  className="block rounded-lg px-4 py-3 text-sm text-gray-800 hover:bg-blue-50"
-                >
-                  🏠 My Space
-                </Link>
                 <Link
                   role="menuitem"
                   href="/discover"
@@ -226,6 +250,41 @@ export function BottomBar() {
             >
               🎯 Create activity
             </Link>
+          </div>
+        )}
+        {accountMenuOpen && (
+          <div
+            role="menu"
+            aria-label="Account"
+            className={`absolute bottom-full mb-2 w-56 overflow-hidden rounded-xl border border-gray-200 bg-white p-1 shadow-xl ${isHomePage ? "left-3 sm:left-6 lg:left-8" : "right-3 sm:right-6 lg:right-8"}`}
+          >
+            <Link
+              role="menuitem"
+              href="/my-space"
+              onClick={() => setAccountMenuOpen(false)}
+              className="block rounded-lg px-4 py-3 text-sm text-gray-800 hover:bg-blue-50"
+            >
+              🏠 My Space
+            </Link>
+            <Link
+              role="menuitem"
+              href="/requests"
+              onClick={() => setAccountMenuOpen(false)}
+              className="block rounded-lg px-4 py-3 text-sm text-gray-800 hover:bg-blue-50"
+            >
+              📋 Requests
+            </Link>
+            <button
+              role="menuitem"
+              type="button"
+              onClick={() => {
+                setAccountMenuOpen(false);
+                void signOut();
+              }}
+              className="block w-full rounded-lg px-4 py-3 text-left text-sm text-gray-800 hover:bg-red-50 hover:text-red-700"
+            >
+              ↪ Sign Out
+            </button>
           </div>
         )}
       </div>

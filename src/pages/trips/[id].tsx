@@ -599,18 +599,6 @@ export default function TripDetails() {
                 💰 Expense
               </button>
             )}
-            <Link href={`/trips/${trip.id}/destinations`} className="min-w-0">
-              <button
-                disabled={userRole === "reader"}
-                className={`w-full rounded-lg px-2 py-2.5 text-xs font-medium shadow-sm sm:px-4 sm:text-sm ${userRole === "reader"
-                    ? "bg-gray-400 text-gray-600 cursor-not-allowed"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
-                  }`}
-                title={userRole === "reader" ? "Guests cannot add destinations" : ""}
-              >
-                🌍 Destinations
-              </button>
-            </Link>
             <button
               onClick={() => {
                 setSelectedActivityDestination(destinations.length > 0 ? destinations[0].id : "");
@@ -668,11 +656,6 @@ export default function TripDetails() {
                 tripId={trip.id}
               />
             </div>
-            <Link href={`/trips/${trip.id}/schedule`}>
-              <button className="mt-4 w-full px-3 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 text-sm">
-                Manage Schedule
-              </button>
-            </Link>
           </div>
 
           {/* Budget */}
@@ -704,11 +687,6 @@ export default function TripDetails() {
                 </div>
                 <p className="text-xs text-gray-600">{budgetPercentage.toFixed(1)}% spent</p>
               </div>
-              <Link href={`/budgets?tripId=${trip.id}`}>
-                <button className="mt-4 w-full px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
-                  View Budget
-                </button>
-              </Link>
             </div>
           ) : (
             <div className="rounded-2xl border-t-4 border-gray-300 bg-white p-4 shadow-sm sm:p-6">
