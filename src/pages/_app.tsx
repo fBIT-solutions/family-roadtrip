@@ -4,6 +4,7 @@ import Head from "next/head";
 import axios from "axios";
 import "@/globals.css";
 import { ToasterProvider } from "@/components/ToasterProvider";
+import { BottomBar } from "@/components/BottomBar";
 
 // Configure axios to send credentials (cookies) with all requests
 axios.defaults.withCredentials = true;
@@ -17,9 +18,11 @@ export default function App({ Component, pageProps: { session, ...pageProps } }:
       </Head>
       <SessionProvider session={session}>
         <ToasterProvider />
-        <Component {...pageProps} />
+        <div className="app-content">
+          <Component {...pageProps} />
+        </div>
+        <BottomBar />
       </SessionProvider>
     </>
   );
 }
-
