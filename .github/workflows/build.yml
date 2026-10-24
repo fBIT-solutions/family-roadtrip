@@ -1,10 +1,14 @@
 name: Build Verification
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
 
 on:
   push:
     branches: [master, preview]
   pull_request:
-    branches: [master, preview]
+    branches: [master, preview, patches]
 
 jobs:
   build:
