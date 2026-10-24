@@ -40,5 +40,19 @@ jobs:
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: '❌ **Type checking failed** - Please fix TypeScript errors before merging.'
+              body: '❌ **[Type checking] failed** - Please fix TypeScript errors before merging.'
             })
+
+      - name: Comment PR on success
+        if: success() && github.event_name == 'pull_request'
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ **[Type checking] All tests passed** - Great work!'
+            })
+
