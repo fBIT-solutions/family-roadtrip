@@ -2,7 +2,24 @@
 
 A collaborative web application for planning and managing family road trips. Plan destinations, track expenses, manage reservations, and coordinate with family members in real-time.
 
-**Live Demo:** [Family Road Trip 2028](https://family-roadtrip.fambalker.net)
+**Live Demo:** [Family Roadtrip](https://holiday-tracker.fbit.dev)
+
+## Status
+
+PRODUCTION
+[![Build Verification](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/build.yml/badge.svg)](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/build.yml)
+[![CodeQL](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/github-code-scanning/codeql/badge.svg)](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/github-code-scanning/codeql)
+[![ESLint](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/lint.yml/badge.svg)](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/lint.yml)
+[![Unit Tests](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/tests.yml/badge.svg)](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/tests.yml)
+[![TypeScript Type Check](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/type-check.yml/badge.svg)](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/type-check.yml)
+
+PREVIEW
+[![Build Verification](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/build.yml/badge.svg?branch=preview)](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/build.yml)
+[![CodeQL](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/github-code-scanning/codeql/badge.svg?branch=preview)](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/github-code-scanning/codeql)
+[![ESLint](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/lint.yml/badge.svg?branch=preview)](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/lint.yml)
+[![Unit Tests](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/tests.yml/badge.svg?branch=preview)](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/tests.yml)
+[![TypeScript Type Check](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/type-check.yml/badge.svg?branch=preview)](https://github.com/fBIT-solutions/family-roadtrip/actions/workflows/type-check.yml)
+
 
 ## 🌟 Features
 

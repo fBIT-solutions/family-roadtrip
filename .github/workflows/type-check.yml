@@ -1,10 +1,12 @@
 name: TypeScript Type Check
-
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+  
 on:
-  push:
-    branches: [master, preview]
   pull_request:
-    branches: [master, preview]
+    branches: [master, preview, patches]
 
 jobs:
   type-check:
@@ -13,6 +15,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
 
       - uses: actions/setup-node@v7
         with:
