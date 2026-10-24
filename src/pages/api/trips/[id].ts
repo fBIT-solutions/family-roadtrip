@@ -19,7 +19,13 @@ const UpdateTripSchema = TripSchema.pick({
   hasPet: true,
   description: true,
   status: true,
-}).partial(); // Make all fields optional for partial updates
+}).extend({
+  people: TripSchema.shape.people.removeDefault(),
+  viewers: TripSchema.shape.viewers.removeDefault(),
+  hasPet: TripSchema.shape.hasPet.removeDefault(),
+  status: TripSchema.shape.status.removeDefault(),
+  currency: TripSchema.shape.currency.removeDefault(),
+}).partial();
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const session = await getServerSession(req, res, authOptions);

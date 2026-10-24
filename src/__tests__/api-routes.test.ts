@@ -86,6 +86,10 @@ describe("Trip API route", () => {
     });
   });
 
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
   it("rejects requests without a session", async () => {
     getSessionMock.mockResolvedValue(null);
     const response = createResponse();
@@ -276,13 +280,15 @@ describe("Trip API route", () => {
   });
 
   it("returns 500 when loading a trip fails", async () => {
-    getTripWithStatsMock.mockRejectedValue(new Error("database unavailable"));
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+    getTripWithStatsMock.mockRejectedValue(new Error("simulated storage failure"));
     const response = createResponse();
 
     await handler(createRequest("GET", { id: tripId }), response);
 
     expect(response.status).toHaveBeenCalledWith(500);
     expect(response.json).toHaveBeenCalledWith({ error: "Failed to fetch trip" });
+    expect(consoleError).toHaveBeenCalled();
   });
 
   it("returns 404 when updating a trip that does not exist", async () => {
@@ -378,7 +384,8 @@ describe("Trip API route", () => {
   });
 
   it("returns 500 when trip creation fails", async () => {
-    createTripMock.mockRejectedValue(new Error("database unavailable"));
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+    createTripMock.mockRejectedValue(new Error("simulated storage failure"));
     const response = createResponse();
 
     await tripsHandler(
@@ -394,9 +401,11 @@ describe("Trip API route", () => {
 
     expect(response.status).toHaveBeenCalledWith(500);
     expect(response.json).toHaveBeenCalledWith({ error: "Failed to create trip" });
+    expect(consoleError).toHaveBeenCalled();
   });
 
   it("rejects trip-list requests without a session", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
     getSessionMock.mockResolvedValue(null);
     const response = createResponse();
 
@@ -405,16 +414,19 @@ describe("Trip API route", () => {
     expect(response.status).toHaveBeenCalledWith(401);
     expect(response.json).toHaveBeenCalledWith({ error: "Unauthorized" });
     expect(getTripsMock).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalled();
   });
 
   it("returns 500 when listing trips fails", async () => {
-    getTripsMock.mockRejectedValue(new Error("database unavailable"));
+    const consoleError = jest.spyOn(console, "error").mockImplementation(() => {});
+    getTripsMock.mockRejectedValue(new Error("simulated storage failure"));
     const response = createResponse();
 
     await tripsHandler(createRequest("GET"), response);
 
     expect(response.status).toHaveBeenCalledWith(500);
     expect(response.json).toHaveBeenCalledWith({ error: "Failed to fetch trips" });
+    expect(consoleError).toHaveBeenCalled();
   });
 
   it("returns 405 for unsupported trip-list methods", async () => {
