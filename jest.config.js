@@ -16,13 +16,11 @@ const customJestConfig = {
   testPathIgnorePatterns: [
     '<rootDir>/.next/',
     '<rootDir>/node_modules/',
-    '<rootDir>/src/pages/api/', // Don't test API routes directly
   ],
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
     '!src/**/*.d.ts',
     '!src/**/*.stories.{js,jsx,ts,tsx}',
-    '!src/pages/api/**', // API routes tested separately
     '!src/pages/_*.{js,jsx,ts,tsx}', // Next.js internals
   ],
   moduleNameMapper: {
