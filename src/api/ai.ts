@@ -18,9 +18,9 @@ const model = process.env.GOOGLE_CLOUD_MODEL || "gemini-2.5-flash";
 // Construct endpoint - handles both global and regional endpoints
 const getEndpoint = () => {
   if (location === "global") {
-    return `https://aiplatform.googleapis.com/v1/projects/${project}/locations/global/publishers/google/models/${model}:generateContent`;
+    return `https://aiplatform.googleapis.com/v1/projects/${project}/locations/global/publishers/google/models/${model}:streamGenerateContent`;
   }
-  return `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:generateContent`;
+  return `https://${location}-aiplatform.googleapis.com/v1/projects/${project}/locations/${location}/publishers/google/models/${model}:streamGenerateContent`;
 };
 
 /**
