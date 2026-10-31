@@ -70,18 +70,15 @@ async function callVertexAI(prompt: string): Promise<string> {
     }
 
     const data = await response.json();
-    console.log("Vertex AI response structure:", {
-      hasData: !!data,
-      hasCandidates: !!data.candidates,
-      candidateCount: data.candidates?.length || 0,
-      firstCandidate: data.candidates?.[0] ? {
-        hasContent: !!data.candidates[0].content,
-        hasParts: !!data.candidates[0].content?.parts,
-        partCount: data.candidates[0].content?.parts?.length || 0,
-      } : null,
-    });
+    // streamGenerateContent returns an array of chunks; a single object is also handled
+    const chunks: any[] = Array.isArray(data) ? data : [data];
+    console.log("Vertex AI response structure:", { chunkCount: chunks.length });
 
-    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    const content = chunks
+      .flatMap((chunk) => chunk?.candidates?.[0]?.content?.parts || [])
+      .filter((part: any) => typeof part?.text === "string" && !part.thought)
+      .map((part: any) => part.text)
+      .join("");
 
     if (!content) {
       console.error("No content extracted from Vertex AI response");
